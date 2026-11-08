@@ -1,0 +1,9 @@
+# The image build (deploy/app.Dockerfile) installs and builds everything itself; keep local builds, dependencies and
+# secrets out of the build context.
+**/node_modules
+src/web/dist
+src/backend/bin
+deploy/secrets
+deploy/.env
+.git
+assets

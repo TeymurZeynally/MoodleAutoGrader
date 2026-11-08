@@ -1,0 +1,102 @@
+# Static analysis of the backend: make lint from the repository root (Docker).
+# Long lines are welcome here: lll and golines stay off, nothing asks to put each argument on its own line. funlen stays
+# off for the same reason. Of wsl only one check is on: a blank line after a block in the main logic of a function.
+version: "2"
+run:
+  timeout: 5m
+  tests: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  enable:
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - containedctx
+    - copyloopvar
+    - dupword
+    - durationcheck
+    - errcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - exptostd
+    - fatcontext
+    - forcetypeassert
+    - gocritic
+    - gocyclo
+    - godot
+    - gosec
+    - govet
+    - ineffassign
+    - intrange
+    - loggercheck
+    - misspell
+    - modernize
+    - nestif
+    - nilerr
+    - noctx
+    - nolintlint
+    - perfsprint
+    - predeclared
+    - reassign
+    - revive
+    - rowserrcheck
+    - sloglint
+    - sqlclosecheck
+    - staticcheck
+    - thelper
+    - unconvert
+    - unused
+    - usestdlibvars
+    - usetesting
+    - whitespace
+    - wsl_v5
+  settings:
+    errcheck:
+      check-type-assertions: true
+      exclude-functions:
+        # defer tx.Rollback(ctx): after a commit it returns ErrTxClosed by design.
+        - (github.com/jackc/pgx/v5.Tx).Rollback
+    gocyclo:
+      min-complexity: 25
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    wsl_v5:
+      default: none
+      enable: [after-block]
+  exclusions:
+    presets:
+      # Errors of Close, Flush and os.Remove in defer: nothing useful can be done with them.
+      - std-error-handling
+    rules:
+      # A comment on every exported name would repeat the name: comments stay where they add something. A comment that
+      # exists must still start with the name; revive checks that.
+      - linters: [revive]
+        text: "should have comment"
+      # A long test reads top to bottom; splitting it would hide the scenario.
+      - linters: [gocyclo]
+        path: _test\.go
+      # A developer tool writing generated files into the repository: they must be readable, and the paths are its own.
+      - linters: [gosec]
+        path: cmd/dbschema/
+      # wsl has no depth setting. A closing brace indented deeper than one tab belongs to nested code (inside another
+      # block or a case), where a blank line is not required.
+      - linters: [wsl_v5]
+        source: '^\t\t+\}'
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      module-path: moodle-autograder # without a dot in it gofumpt takes the module for the standard library
+      extra:
+        group-params: true
+    goimports:
+      local-prefixes: [moodle-autograder]

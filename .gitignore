@@ -1,0 +1,16 @@
+/docs/
+/dev/
+
+# Secrets and what belongs to one installation.
+.env
+*.env
+/deploy/secrets/
+/deploy/seed/
+/deploy/compose.local.yml
+/src/backend/cmd/autograder/local.go
+
+# Builds and dependencies.
+/src/backend/bin/
+/src/web/dist/
+node_modules/
+__pycache__/

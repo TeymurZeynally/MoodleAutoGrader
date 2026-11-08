@@ -1,0 +1,5 @@
+# An NVIDIA GPU for the model server (needs nvidia-container-toolkit on the host). Switched on in .env:
+#   COMPOSE_FILE=docker-compose.yml:compose.gpu.yml
+services:
+  ollama:
+    deploy: { resources: { reservations: { devices: [{ driver: nvidia, count: all, capabilities: [gpu] }] } } }

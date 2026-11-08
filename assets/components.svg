@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1310" height="770" viewBox="0 0 1310 770">
+<rect width="1310" height="770" fill="#fff"/>
+<rect x="20" y="100" width="1020" height="260" fill="#fff"/>
+<rect x="20" y="360" width="1020" height="390" fill="#f4f4f4"/>
+<rect x="20" y="100" width="1020" height="650" fill="none" stroke="#888" stroke-width="1.3"/>
+<line x1="20" y1="360" x2="1040" y2="360" stroke="#888" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="48" y1="100" x2="48" y2="750" stroke="#888" stroke-width="1"/>
+<text x="39" y="230.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#555" text-anchor="middle" transform="rotate(-90 39 230.0)">With internet access</text>
+<text x="39" y="555.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#555" text-anchor="middle" transform="rotate(-90 39 555.0)">Internal networks only</text>
+<text x="24" y="92" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" font-style="normal" text-anchor="start" fill="#555">Docker Compose stack</text>
+<circle cx="180" cy="18" r="8" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<path d="M180,26 L180,46 M168,34 L192,34 M180,46 L170,60 M180,46 L190,60" fill="none" stroke="#333" stroke-width="1.3"/>
+<text x="196" y="52" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" font-style="normal" text-anchor="start" fill="#222">Teacher</text>
+<rect x="80.0" y="230" width="200" height="66" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<rect x="258.0" y="238" width="14" height="12" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="255.0" y="240" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="255.0" y="245" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<text x="180" y="259.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" font-style="normal" text-anchor="middle" fill="#222">app</text>
+<text x="180" y="276.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle" fill="#444">web UI and API</text>
+<rect x="780.0" y="230" width="200" height="66" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<rect x="958.0" y="238" width="14" height="12" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="955.0" y="240" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="955.0" y="245" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<text x="880" y="259.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" font-style="normal" text-anchor="middle" fill="#222">worker-moodle</text>
+<text x="880" y="276.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle" fill="#444">sync and publishing</text>
+<rect x="250.0" y="400" width="200" height="66" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<rect x="428.0" y="408" width="14" height="12" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="425.0" y="410" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="425.0" y="415" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<text x="350" y="421.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" font-style="normal" text-anchor="middle" fill="#222">worker-core</text>
+<text x="350" y="438.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle" fill="#444">reads and compares works,</text>
+<text x="350" y="455.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle" fill="#444">runs the AI check</text>
+<line x1="180" y1="216" x2="180" y2="230" stroke="#333" stroke-width="1.3"/>
+<circle cx="180" cy="208" r="8" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<text x="186" y="227" font-family="Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" font-style="normal" text-anchor="start" fill="#222">HTTP</text>
+<polyline points="180,66 180,200" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="175,192 180,200 185,192" fill="none" stroke="#555" stroke-width="1.2"/>
+<rect x="70.0" y="640" width="120" height="84" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<rect x="168.0" y="648" width="14" height="12" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="165.0" y="650" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="165.0" y="655" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<text x="130" y="670.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" font-style="normal" text-anchor="middle" fill="#222">tools</text>
+<text x="130" y="687.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle" fill="#444">PDF, archives,</text>
+<text x="130" y="704.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle" fill="#444">Word</text>
+<rect x="290.0" y="640" width="120" height="84" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<rect x="388.0" y="648" width="14" height="12" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="385.0" y="650" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="385.0" y="655" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<text x="350" y="678.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" font-style="normal" text-anchor="middle" fill="#222">Dolos</text>
+<text x="350" y="695.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle" fill="#444">code similarity</text>
+<rect x="480.0" y="640" width="120" height="84" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<rect x="578.0" y="648" width="14" height="12" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="575.0" y="650" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="575.0" y="655" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<text x="540" y="678.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" font-style="normal" text-anchor="middle" fill="#222">Ollama</text>
+<text x="540" y="695.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle" fill="#444">local models</text>
+<rect x="620.0" y="640" width="120" height="84" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<rect x="718.0" y="648" width="14" height="12" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="715.0" y="650" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="715.0" y="655" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<text x="680" y="660" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" font-style="normal" text-anchor="middle" fill="#222">Temporal</text>
+<text x="680" y="676" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle" fill="#444">background jobs</text>
+<path d="M645.0,690 L645.0,712 A35.0,6 0 0 0 715.0,712 L715.0,690" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<ellipse cx="680" cy="690" rx="35.0" ry="6" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<text x="680" y="708.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle" fill="#222">SQLite</text>
+<path d="M760.0,650 L760.0,714 A60.0,10 0 0 0 880.0,714 L880.0,650" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<ellipse cx="820" cy="650" rx="60.0" ry="10" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<text x="820" y="684.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" font-style="normal" text-anchor="middle" fill="#222">Postgres</text>
+<text x="820" y="701.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle" fill="#444">grades, checklists</text>
+<path d="M900.0,650 L900.0,714 A60.0,10 0 0 0 1020.0,714 L1020.0,650" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<ellipse cx="960" cy="650" rx="60.0" ry="10" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<text x="960" y="684.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" font-style="normal" text-anchor="middle" fill="#222">SeaweedFS</text>
+<text x="960" y="701.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="normal" text-anchor="middle" fill="#444">files of students</text>
+<rect x="1090.0" y="640" width="140" height="84" fill="#eeeeee" stroke="#333" stroke-width="1.3"/>
+<rect x="1208.0" y="648" width="14" height="12" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="1205.0" y="650" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<rect x="1205.0" y="655" width="6" height="3" fill="#fff" stroke="#333" stroke-width="1"/>
+<text x="1160" y="678.0" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" font-style="italic" text-anchor="middle" fill="#555">«external system»</text>
+<text x="1160" y="695.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" font-style="normal" text-anchor="middle" fill="#222">Moodle</text>
+<line x1="130" y1="626" x2="130" y2="640" stroke="#333" stroke-width="1.3"/>
+<circle cx="130" cy="618" r="8" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<text x="136" y="637" font-family="Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" font-style="normal" text-anchor="start" fill="#222">HTTP</text>
+<line x1="350" y1="626" x2="350" y2="640" stroke="#333" stroke-width="1.3"/>
+<circle cx="350" cy="618" r="8" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<text x="356" y="637" font-family="Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" font-style="normal" text-anchor="start" fill="#222">HTTP</text>
+<line x1="540" y1="626" x2="540" y2="640" stroke="#333" stroke-width="1.3"/>
+<circle cx="540" cy="618" r="8" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<text x="546" y="637" font-family="Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" font-style="normal" text-anchor="start" fill="#222">HTTP</text>
+<line x1="680" y1="626" x2="680" y2="640" stroke="#333" stroke-width="1.3"/>
+<circle cx="680" cy="618" r="8" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<text x="686" y="637" font-family="Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" font-style="normal" text-anchor="start" fill="#222">gRPC</text>
+<line x1="820" y1="626" x2="820" y2="640" stroke="#333" stroke-width="1.3"/>
+<circle cx="820" cy="618" r="8" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<text x="826" y="637" font-family="Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" font-style="normal" text-anchor="start" fill="#222">SQL</text>
+<line x1="960" y1="626" x2="960" y2="640" stroke="#333" stroke-width="1.3"/>
+<circle cx="960" cy="618" r="8" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<text x="966" y="637" font-family="Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" font-style="normal" text-anchor="start" fill="#222">S3 API</text>
+<line x1="1160" y1="626" x2="1160" y2="640" stroke="#333" stroke-width="1.3"/>
+<circle cx="1160" cy="618" r="8" fill="#fff" stroke="#333" stroke-width="1.3"/>
+<text x="1166" y="637" font-family="Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" font-style="normal" text-anchor="start" fill="#222">REST over HTTPS</text>
+<path d="M130.0,296.0 C130.0,405.9 130.0,540.0 130.0,610.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="135.0,601.0 130.0,610.0 125.0,601.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M280.0,242.0 C688.0,242.0 960.0,540.0 960.0,610.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="965.0,601.0 960.0,610.0 955.0,601.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M280.0,256.0 C604.0,256.0 820.0,540.0 820.0,610.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="825.0,601.0 820.0,610.0 815.0,601.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M280.0,270.0 C520.0,270.0 680.0,540.0 680.0,610.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="685.0,601.0 680.0,610.0 675.0,601.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M280.0,284.0 C436.0,284.0 540.0,540.0 540.0,610.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="545.0,601.0 540.0,610.0 535.0,601.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M350.0,466.0 C350.0,526.0 350.0,540.0 350.0,610.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="355.0,601.0 350.0,610.0 345.0,601.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M450.0,412.0 C751.8,412.0 892.5,579.0 953.1,614.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="947.8,605.2 953.1,614.0 942.8,613.8" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M450.0,426.0 C667.8,426.0 752.5,579.0 813.1,614.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="807.8,605.2 813.1,614.0 802.8,613.8" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M450.0,440.0 C583.8,440.0 612.5,579.0 673.1,614.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="667.8,605.2 673.1,614.0 662.8,613.8" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M450.0,454.0 C499.8,454.0 472.5,579.0 533.1,614.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="527.8,605.2 533.1,614.0 522.8,613.8" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M250.0,433.0 C182.2,433.0 197.5,579.0 136.9,614.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="147.2,613.8 136.9,614.0 142.2,605.2" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M800.0,296.0 C800.0,407.3 747.5,579.0 686.9,614.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="697.2,613.8 686.9,614.0 692.2,605.2" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M880.0,296.0 C880.0,407.3 887.5,579.0 826.9,614.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="837.2,613.8 826.9,614.0 832.2,605.2" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M960.0,296.0 C960.0,407.3 1027.5,579.0 966.9,614.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="977.2,613.8 966.9,614.0 972.2,605.2" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M250,230 L250,170 Q250,150 270,150 L1170,150 Q1190,150 1190,170 L1190,584.0 Q1190,606.0 1166.9,614.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="1177.1,615.8 1166.9,614.0 1173.8,606.3" fill="none" stroke="#555" stroke-width="1.2"/>
+<path d="M980.0,263.0 C1100.0,263.0 1092.5,579.0 1153.1,614.0" fill="none" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<polyline points="1147.8,605.2 1153.1,614.0 1142.8,613.8" fill="none" stroke="#555" stroke-width="1.2"/>
+</svg>

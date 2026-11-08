@@ -1,0 +1,243 @@
+# MoodleAutoGrader stack: docker compose up -d --build, then open http://localhost:8180. The first sign-in asks for the
+# address of the Moodle site and keeps it; MOODLE_URL in .env sets it instead (see .env.example).
+# Only the web UI is published (127.0.0.1:8180); the other services are reachable inside the Compose networks only.
+#
+# The application is three processes of one image. app and worker-moodle hold the session key and reach Moodle; they do
+# not read the files of students. worker-core reads them, and has neither that key nor the internet. migrate alone has the
+# password of the database owner, the others connect as a role that can only work with rows.
+#
+# The stack starts without any AI model and works without a GPU. Models are managed with the Ollama command line:
+#   docker compose run --rm ollama-cli pull <model>     then choose it on the course's "AI prompts" tab
+#   docker compose run --rm ollama-cli list
+#   docker compose run --rm ollama-cli rm <model>
+# An NVIDIA GPU is switched on by compose.gpu.yml, see .env.example. Note: docker compose down -v deletes the downloaded
+# models along with the data.
+name: moodle-autograder
+
+x-process: &process
+  image: ${COMPOSE_PROJECT_NAME:-moodle-autograder}-app  # built once, by the service app
+  pull_policy: never
+  user: "${APP_UID:-1000}:${APP_GID:-1000}"  # init gives the secret files to this user
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 512
+  restart: unless-stopped
+
+x-environment: &environment
+  POSTGRES_USER: autograder_app
+  POSTGRES_PASSWORD_FILE: /run/secrets/postgres_app_password
+  S3_ENDPOINT: seaweedfs:8333
+  S3_ACCESS_KEY_FILE: /run/secrets/s3_access_key
+  S3_SECRET_KEY_FILE: /run/secrets/s3_secret_key
+  TEMPORAL_ADDRESS: temporal:7233
+  TZ: ${TZ:-UTC}  # local time in comments for students
+
+services:
+  # Creates the random secrets in deploy/secrets on the first start, existing files are kept, gives each service a folder
+  # with only the secrets it needs, and gives deploy/seed to the user. No network.
+  init:
+    image: alpine:3.22
+    network_mode: none
+    volumes: ["./secrets:/secrets", "./seed:/seed"]
+    environment: { OWNER: "${APP_UID:-1000}:${APP_GID:-1000}" }
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER]
+    security_opt: ["no-new-privileges:true"]
+    command:
+      - sh
+      - -euc
+      - |
+        cd /secrets
+        rand() { head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32; }
+        [ -f postgres_password ] || rand > postgres_password
+        [ -f postgres_app_password ] || rand > postgres_app_password
+        [ -f session_key ] || head -c 32 /dev/urandom | base64 > session_key
+        if [ ! -f s3.json ]; then
+          key=$$(rand) secret=$$(rand)
+          printf '%s' "$$key" > s3_access_key
+          printf '%s' "$$secret" > s3_secret_key
+          printf '{"identities": [{"name": "app", "credentials": [{"accessKey": "%s", "secretKey": "%s"}], "actions": ["Admin", "Read", "Write", "List", "Tagging"]}]}\n' "$$key" "$$secret" > s3.json
+        fi
+        mkdir -p postgres seaweedfs migrate app worker-moodle worker-core
+        find postgres seaweedfs migrate app worker-moodle worker-core -type f -delete
+        cp postgres_password postgres/
+        cp s3.json seaweedfs/
+        cp postgres_password postgres_app_password migrate/
+        cp postgres_app_password s3_access_key s3_secret_key session_key app/
+        cp postgres_app_password s3_access_key s3_secret_key session_key worker-moodle/
+        cp postgres_app_password s3_access_key s3_secret_key worker-core/
+        chown -R "$$OWNER" .
+        find . -type d -exec chmod 700 {} +
+        find . -type f -exec chmod 600 {} +
+        chown "$$OWNER" /seed
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: autograder
+      POSTGRES_DB: autograder
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes: ["pgdata:/var/lib/postgresql", "./secrets/postgres:/run/secrets:ro"]
+    networks: [data]
+    depends_on: { init: { condition: service_completed_successfully } }
+    # Over TCP: on the first start the image runs a temporary server on the socket only, and migrate would come too early.
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U autograder -d autograder"], interval: 5s, timeout: 3s, retries: 20 }
+    read_only: true
+    tmpfs: [/tmp, /var/run/postgresql]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]  # the image starts as root, owns its data dir, then runs as postgres
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    pids_limit: 256
+    restart: unless-stopped
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.50
+    command: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/run/secrets/s3.json", "-master.volumeSizeLimitMB=1024"]
+    volumes: ["objects:/data", "./secrets/seaweedfs:/run/secrets:ro"]
+    networks: [data]
+    depends_on: { init: { condition: service_completed_successfully } }
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]  # the image starts as root, owns /data, then runs as seaweed
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 2g
+    pids_limit: 256
+    restart: unless-stopped
+
+  temporal:
+    image: temporalio/temporal:1.10.0
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--ui-ip", "0.0.0.0", "--db-filename", "/home/temporal/temporal.db", "--headless"]
+    volumes: [temporal:/home/temporal]  # image user is uid 1000; a fresh volume inherits the owner of this dir
+    networks: [data]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    pids_limit: 256
+    restart: unless-stopped
+
+  # Applies the database migrations and prepares the role of the other processes, then exits.
+  migrate:
+    <<: *process
+    command: ["migrate"]
+    environment:
+      POSTGRES_USER: autograder
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      APP_DB_PASSWORD_FILE: /run/secrets/postgres_app_password
+    volumes: ["./secrets/migrate:/run/secrets:ro"]
+    networks: [data]
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
+
+  # The web UI and the API. It reads no files of students: toolsd lists archives for the viewer.
+  app:
+    <<: *process
+    build: { context: .., dockerfile: deploy/app.Dockerfile, target: app }
+    pull_policy: missing
+    command: ["web"]
+    environment:
+      <<: *environment
+      SESSION_KEY_FILE: /run/secrets/session_key
+      MOODLE_URL: ${MOODLE_URL:-}  # empty: the first sign-in sets the site
+      COOKIE_SECURE: ${COOKIE_SECURE:-0}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}  # AI check with local models; none to turn it off
+      OLLAMA_URL: http://ollama:11434
+      TOOLS_URL: http://tools:8080
+    volumes: ["./secrets/app:/run/secrets:ro"]
+    ports: ["127.0.0.1:${APP_PORT:-8180}:8080"]  # UI and API: http://autograder.localhost:8180
+    networks: [default, data, tools, llm]
+    depends_on: { migrate: { condition: service_completed_successfully }, seaweedfs: { condition: service_started }, temporal: { condition: service_started }, ollama: { condition: service_started }, tools: { condition: service_started } }
+    mem_limit: 2g
+
+  # Reads from and publishes to Moodle with the teacher's token. What it downloads it stores without reading.
+  worker-moodle:
+    <<: *process
+    command: ["worker-moodle"]
+    environment:
+      <<: *environment
+      SESSION_KEY_FILE: /run/secrets/session_key
+      MOODLE_URL: ${MOODLE_URL:-}  # empty: the first sign-in sets the site
+      SEED_DIR: /seed  # prepared criteria, prompts and settings of courses, see seed.example
+    volumes: ["./secrets/worker-moodle:/run/secrets:ro", "./seed:/seed:ro"]
+    networks: [default, data]
+    depends_on: { app: { condition: service_started }, migrate: { condition: service_completed_successfully }, seaweedfs: { condition: service_started }, temporal: { condition: service_started } }
+    mem_limit: 2g
+
+  # Reads the files of students, compares them and runs the AI check. No session key and no internet: only internal networks.
+  worker-core:
+    <<: *process
+    command: ["worker-core"]
+    environment:
+      <<: *environment
+      DOLOS_URL: http://dolos:8080  # code similarity (empty: built-in fingerprints)
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}  # AI check with local models; none to turn it off
+      OLLAMA_URL: http://ollama:11434
+      TOOLS_URL: http://tools:8080
+      SEED_DIR: /seed  # models.json, Ollama's options per model
+    volumes: ["./secrets/worker-core:/run/secrets:ro", "./seed:/seed:ro"]
+    networks: [data, tools, compare, llm]
+    depends_on: { app: { condition: service_started }, migrate: { condition: service_completed_successfully }, seaweedfs: { condition: service_started }, temporal: { condition: service_started }, dolos: { condition: service_started }, ollama: { condition: service_started }, tools: { condition: service_started } }
+    mem_limit: 4g
+
+  # Dolos (tree-sitter code plagiarism detection) on an internal network: it gets student code and has no internet access.
+  dolos:
+    build: { context: ./dolos }
+    networks: [compare]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 4g
+    pids_limit: 256
+    restart: unless-stopped
+
+  # The model server, one model loaded at a time. No internet: it gets student work.
+  ollama:
+    image: ollama/ollama:0.40.14
+    networks: [llm]
+    volumes: [models:/root/.ollama]
+    environment: { OLLAMA_NUM_PARALLEL: "1", OLLAMA_MAX_LOADED_MODELS: "1", OLLAMA_KEEP_ALIVE: "30m", OLLAMA_NO_CLOUD: "1", OLLAMA_FLASH_ATTENTION: "${OLLAMA_FLASH_ATTENTION:-}", OLLAMA_KV_CACHE_TYPE: "${OLLAMA_KV_CACHE_TYPE:-}" }
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512  # no memory limit: it depends on the model
+    restart: unless-stopped
+
+  # The Ollama command line with internet access, on the same models and apart from the server above; it sees no student
+  # work. It runs only when called: docker compose run --rm ollama-cli pull <model>
+  ollama-cli:
+    profiles: [cli]
+    image: ollama/ollama:0.40.14
+    volumes: [models:/root/.ollama]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    entrypoint: ["sh", "-c", "ollama serve >/dev/null 2>&1 & until ollama list >/dev/null 2>&1; do sleep 0.2; done; exec ollama \"$$@\"", "--"]
+
+  # Reads what students uploaded for the others: PDFs with poppler, archives and Word documents for the viewer. No network
+  # but its own, no secrets, read-only, nobody.
+  tools:
+    build: { context: .., dockerfile: deploy/app.Dockerfile, target: tools }
+    networks: [tools]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 2g
+    pids_limit: 256
+    restart: unless-stopped
+
+networks:
+  data: { internal: true }
+  tools: { internal: true }
+  compare: { internal: true }
+  llm: { internal: true }
+
+volumes:
+  models: {}
+  pgdata: {}
+  objects: {}
+  temporal: {}

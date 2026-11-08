@@ -1,0 +1,11 @@
+{
+  "name": "Lab 1",
+  "notes": "Screenshots of the terminal count as proof that the service was run.",
+  "criteria": [
+    { "text": "The report describes how the service was tested", "where": "report", "points": 2 },
+    { "text": "The service implements every method from the assignment", "where": "code", "points": 3 }
+  ],
+  "extras": [
+    { "text": "The service has automated tests", "where": "code" }
+  ]
+}

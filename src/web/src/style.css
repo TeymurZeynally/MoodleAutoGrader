@@ -1,0 +1,22 @@
+body { margin: 0; background: #f5f7fa; }
+.code-view { position: relative; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; overflow: auto; max-height: 70vh; }
+.code-line { display: flex; white-space: pre; }
+.code-line .ln { flex: none; width: 48px; padding-right: 10px; text-align: right; color: #bfbfbf; user-select: none; }
+.code-line .tx { flex: 1; padding-right: 12px; }
+.code-line.match { background: #fff1f0; box-shadow: inset 3px 0 #ff4d4f; }
+.code-line.common { background: #f5f5f5; box-shadow: inset 3px 0 #d9d9d9; }
+.legend-match, .legend-common { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+.legend-match { background: #fff1f0; border: 1px solid #ff4d4f; }
+.legend-common { background: #f5f5f5; border: 1px solid #d9d9d9; }
+.ant-table-cell .ant-input { font-size: 13px; }
+.file-tree { max-height: 66vh; overflow: auto; margin-top: 8px; padding-right: 4px; border: 1px solid #f0f0f0; border-radius: 8px; }
+/* Long paths scroll sideways instead of wrapping: the tree is as wide as its longest name. */
+.file-tree .ant-tree { width: max-content; min-width: 100%; }
+.file-tree .ant-tree-node-content-wrapper { display: flex; align-items: flex-start; }
+.file-tree .ant-tree-title { flex: 1; white-space: nowrap; }
+.file-tree .ant-tree-iconEle { flex: none; }
+/* Grades table: long file and student names wrap inside their column instead of overlapping the next one. */
+.grades .ant-table-cell { overflow: hidden; overflow-wrap: anywhere; }
+.wrap-tag { display: inline-flex; align-items: flex-start; gap: 4px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; height: auto; line-height: 18px; padding-block: 2px; margin-inline-end: 0; }
+.wrap-tag .anticon { margin-top: 3px; } .wrap-tag .anticon + span { margin-inline-start: 0; }
+.prompt-pre { white-space: pre-wrap; background: #fafafa; border: 1px solid #f0f0f0; border-radius: 6px; padding: 8px; font-size: 12px; }
