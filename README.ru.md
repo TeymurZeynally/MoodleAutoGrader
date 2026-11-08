@@ -38,7 +38,7 @@
 **1. Простой запуск**
 
 ```bash
-git clone https://github.com/<owner>/MoodleAutoGrader.git
+git clone https://github.com/TeymurZeynally/MoodleAutoGrader.git
 cd MoodleAutoGrader/deploy
 docker compose up -d --build
 ```

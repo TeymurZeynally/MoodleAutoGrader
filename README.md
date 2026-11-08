@@ -38,7 +38,7 @@ You need [Docker](https://docs.docker.com/engine/install/) with Compose and a te
 **1. Start**
 
 ```bash
-git clone https://github.com/<owner>/MoodleAutoGrader.git
+git clone https://github.com/TeymurZeynally/MoodleAutoGrader.git
 cd MoodleAutoGrader/deploy
 docker compose up -d --build
 ```
