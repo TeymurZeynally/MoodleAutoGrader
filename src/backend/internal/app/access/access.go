@@ -21,8 +21,8 @@ type Moodle interface {
 
 // Sites keeps the Moodle site of the installation.
 type Sites interface {
-	// SetMoodleSite keeps url when no site is kept yet, and returns the site kept now.
-	SetMoodleSite(ctx context.Context, url string) (string, error)
+	// SetMoodleSite keeps url, and whether its certificate goes unchecked, when no site is kept yet; it returns the site kept now.
+	SetMoodleSite(ctx context.Context, url string, skipVerify bool) (string, error)
 }
 
 // Site is who the token belongs to.
@@ -43,10 +43,11 @@ type Store interface {
 }
 
 type Service struct {
-	Store  Store
-	Moodle Moodle
-	Site   string // the Moodle URL: users are kept per site. Empty until the first sign-in sets it
-	Sites  Sites  // keeps the site of the first sign-in; needed only while Site is empty
+	Store     Store
+	Moodle    Moodle
+	Unchecked Moodle // Moodle without the check of its certificate, for a first sign-in that asks for it; needed only while Site is empty
+	Site      string // the Moodle URL: users are kept per site. Empty until the first sign-in sets it
+	Sites     Sites  // keeps the site of the first sign-in; needed only while Site is empty
 }
 
 // Account is a signed-in user; Token goes into the sealed session cookie only.
@@ -57,8 +58,8 @@ type Account struct {
 }
 
 // SignIn checks a Moodle token, or exchanges a username and password for one, and records the user. The site the
-// teacher typed counts only while the installation has none: the first sign-in Moodle accepts sets it.
-func (s *Service) SignIn(ctx context.Context, site, token, username, password string) (Account, error) {
+// teacher typed and skipVerify count only while the installation has none: the first sign-in Moodle accepts sets them.
+func (s *Service) SignIn(ctx context.Context, site, token, username, password string, skipVerify bool) (Account, error) {
 	first := s.Site == ""
 	if !first {
 		site = s.Site
@@ -66,22 +67,27 @@ func (s *Service) SignIn(ctx context.Context, site, token, username, password st
 		return Account{}, app.Fail(app.ErrInvalid, "enter the address of your Moodle site, for example https://moodle.example.edu")
 	}
 
+	moodle := s.Moodle
+	if first && skipVerify {
+		moodle = s.Unchecked
+	}
+
 	token = strings.TrimSpace(token)
 	if token == "" && username != "" {
-		t, err := s.Moodle.ExchangePassword(ctx, site, username, password)
+		t, err := moodle.ExchangePassword(ctx, site, username, password)
 		if err != nil {
 			return Account{}, refused(err, "moodle rejected the login")
 		}
 		token = t
 	}
 
-	info, err := s.Moodle.SiteInfo(ctx, site, token)
+	info, err := moodle.SiteInfo(ctx, site, token)
 	if err != nil {
 		return Account{}, refused(err, "moodle rejected the token")
 	}
 
 	if first {
-		kept, err := s.Sites.SetMoodleSite(ctx, site)
+		kept, err := s.Sites.SetMoodleSite(ctx, site, skipVerify)
 		if err != nil {
 			return Account{}, err
 		}

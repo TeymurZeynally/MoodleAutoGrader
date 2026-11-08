@@ -43,7 +43,7 @@ cd MoodleAutoGrader/deploy
 docker compose up -d --build
 ```
 
-Open **http://autograder.localhost:8180**, enter the address of your Moodle site and sign in with your Moodle username and password (exchanged for a token, never stored) or with a token. The first sign-in keeps the address for everyone who uses this installation.
+Open **http://autograder.localhost:8180**, enter the address of your Moodle site and sign in with your Moodle username and password (exchanged for a token, never stored) or with a token. The first sign-in keeps the address for everyone who uses this installation. If the certificate of the site does not verify, the sign-in offers to go on without the check, and that choice is kept with the address.
 
 <img src="assets/screenshots/sign-in.png" alt="The sign-in page of a new installation" width="520">
 

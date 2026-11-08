@@ -1,23 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, Flex, Form, Input, Tabs, Typography } from 'antd'
+import { Alert, Button, Card, Checkbox, Flex, Form, Input, Tabs, Typography } from 'antd'
 import { GlobalOutlined, KeyOutlined, LockOutlined, UserOutlined } from '@ant-design/icons'
-import { api, errText } from '../api'
+import { ApiError, api, errText } from '../api'
 
 export function Login({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const [site, setSite] = useState<string | null>(null), [typed, setTyped] = useState('') // null: not known yet
+  const [untrusted, setUntrusted] = useState(false), [skipVerify, setSkipVerify] = useState(false) // the certificate of the typed site did not verify
 
   useEffect(() => { api.site().then(s => setSite(s.url), () => setSite('')) }, [])
+
+  const typeSite = (address: string) => { setTyped(address); setUntrusted(false); setSkipVerify(false) }
 
   const submit = async (creds: { token?: string; username?: string; password?: string }) => {
     if (!site && !typed.trim()) { setError('Enter the address of your Moodle site.'); return }
     setError(''); setBusy(true)
-    try { await api.login({ ...creds, site: site || typed }); onDone() } catch (e) { setError(errText(e)) } finally { setBusy(false) }
+    try { await api.login({ ...creds, site: site || typed, skip_verify: skipVerify }); onDone() } catch (e) { setError(errText(e)); if (e instanceof ApiError && e.status === 495) setUntrusted(true) } finally { setBusy(false) }
   }
 
   const where = site
     ? <Typography.Paragraph type="secondary">Moodle: <Typography.Link href={site} target="_blank" rel="noreferrer">{site}</Typography.Link></Typography.Paragraph>
-    : <Form layout="vertical" component="div"><Form.Item label="Moodle site" extra="The address you open Moodle at. The first sign-in sets it for this installation."><Input prefix={<GlobalOutlined />} placeholder="https://moodle.example.edu" value={typed} onChange={e => setTyped(e.target.value)} autoComplete="url" /></Form.Item></Form>
+    : <Form layout="vertical" component="div"><Form.Item label="Moodle site" extra="The address you open Moodle at. The first sign-in sets it for this installation."><Input prefix={<GlobalOutlined />} placeholder="https://moodle.example.edu" value={typed} onChange={e => typeSite(e.target.value)} autoComplete="url" /></Form.Item>{untrusted && <Form.Item extra="Anyone between this server and Moodle could then read the password and the token. The choice stays for this installation."><Checkbox checked={skipVerify} onChange={e => setSkipVerify(e.target.checked)}>Do not verify the certificate of this site</Checkbox></Form.Item>}</Form>
 
   const account = (
     <Form layout="vertical" onFinish={submit} requiredMark={false}>

@@ -34,12 +34,15 @@ func (s *Server) setCookie(w http.ResponseWriter, value string, maxAge int) {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
-	var in struct{ Site, Token, Username, Password string }
+	var in struct {
+		Site, Token, Username, Password string
+		SkipVerify                      bool `json:"skip_verify"`
+	}
 	if !decode(w, r, &in) {
 		return
 	}
 
-	acc, err := s.Access.SignIn(r.Context(), in.Site, in.Token, in.Username, in.Password)
+	acc, err := s.Access.SignIn(r.Context(), in.Site, in.Token, in.Username, in.Password, in.SkipVerify)
 	if err != nil {
 		s.fail(w, err)
 		return

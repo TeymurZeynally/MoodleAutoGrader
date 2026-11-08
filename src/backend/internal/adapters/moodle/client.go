@@ -4,6 +4,7 @@ package moodle
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,6 +41,12 @@ type Option func(*Client)
 func WithTransport(t http.RoundTripper) Option { return func(c *Client) { c.http.Transport = t } }
 
 func WithHTTPClient(h *http.Client) Option { return func(c *Client) { c.http = h } }
+
+// WithoutCertificateCheck reaches a site whose TLS certificate does not verify, so whoever answers at its address gets
+// the token. Only for a site the teacher said so about at the first sign-in.
+func WithoutCertificateCheck() Option {
+	return WithTransport(&http.Transport{Proxy: http.ProxyFromEnvironment, TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}) //nolint:gosec // G402: the teacher chose it at the first sign-in, after the check failed and with the risk stated
+}
 
 // stayOnSite refuses a redirect off the Moodle site: a 307 or 308 would send the token in the body along with it.
 func stayOnSite(req *http.Request, via []*http.Request) error {

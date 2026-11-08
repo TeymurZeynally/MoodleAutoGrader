@@ -14,23 +14,25 @@ import (
 // Schema settings: the Moodle site of the installation, and the rules and prompts a teacher sets per course. A NULL rule
 // means the default (domain/course.Defaults).
 
-// MoodleSite is the site the first sign-in set; empty before it.
-func (s *Store) MoodleSite(ctx context.Context) (string, error) {
+// MoodleSite is the site the first sign-in set and whether its certificate goes unchecked; empty before it.
+func (s *Store) MoodleSite(ctx context.Context) (string, bool, error) {
 	var site string
-	err := s.db.QueryRow(ctx, `select url from settings.site`).Scan(&site)
+	var skipVerify bool
+	err := s.db.QueryRow(ctx, `select url, skip_tls_verify from settings.site`).Scan(&site, &skipVerify)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil
+		return "", false, nil
 	}
 
-	return site, wrap("moodle site", err)
+	return site, skipVerify, wrap("moodle site", err)
 }
 
-// SetMoodleSite keeps url when no site is kept yet, and returns the site kept now.
-func (s *Store) SetMoodleSite(ctx context.Context, url string) (string, error) {
+// SetMoodleSite keeps url and skipVerify when no site is kept yet, and returns the site kept now.
+func (s *Store) SetMoodleSite(ctx context.Context, url string, skipVerify bool) (string, bool, error) {
 	var kept string
-	err := s.db.QueryRow(ctx, `with put as (insert into settings.site (url) values ($1) on conflict do nothing returning url)
-		select url from put union all select url from settings.site limit 1`, url).Scan(&kept)
-	return kept, wrap("set moodle site", err)
+	var keptSkip bool
+	err := s.db.QueryRow(ctx, `with put as (insert into settings.site (url, skip_tls_verify) values ($1, $2) on conflict do nothing returning url, skip_tls_verify)
+		select url, skip_tls_verify from put union all select url, skip_tls_verify from settings.site limit 1`, url, skipVerify).Scan(&kept, &keptSkip)
+	return kept, keptSkip, wrap("set moodle site", err)
 }
 
 func (s *Store) CourseSettings(ctx context.Context, courseID int64) (course.Settings, error) {

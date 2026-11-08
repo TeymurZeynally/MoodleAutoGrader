@@ -54,16 +54,16 @@ func TestEveryQueryRuns(t *testing.T) {
 	five, now := 5.0, time.Now()
 
 	// settings: the site of the installation; the first one stays
-	none, err := s.MoodleSite(ctx)
+	none, _, err := s.MoodleSite(ctx)
 	must("MoodleSite", err)
-	kept, err := s.SetMoodleSite(ctx, site)
+	kept, skip, err := s.SetMoodleSite(ctx, site, true)
 	must("SetMoodleSite", err)
-	again, err := s.SetMoodleSite(ctx, "https://other.test")
+	again, skipAgain, err := s.SetMoodleSite(ctx, "https://other.test", false)
 	must("SetMoodleSite again", err)
-	now2, err := s.MoodleSite(ctx)
+	now2, skipNow, err := s.MoodleSite(ctx)
 	must("MoodleSite after", err)
-	if none != "" || kept != site || again != site || now2 != site {
-		t.Fatalf("site: %q %q %q %q", none, kept, again, now2)
+	if none != "" || kept != site || again != site || now2 != site || !skip || !skipAgain || !skipNow {
+		t.Fatalf("site: %q %q %q %q, unchecked: %v %v %v", none, kept, again, now2, skip, skipAgain, skipNow)
 	}
 
 	// identity, moodle

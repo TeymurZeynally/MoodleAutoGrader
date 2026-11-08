@@ -4,6 +4,7 @@ CREATE TABLE settings.site (
     id boolean DEFAULT true NOT NULL,
     url text NOT NULL,
     set_at timestamp with time zone DEFAULT now() NOT NULL,
+    skip_tls_verify boolean DEFAULT false NOT NULL,
     CONSTRAINT site_id_check CHECK (id)
 );
 

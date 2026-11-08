@@ -12,6 +12,9 @@ import (
 
 // fail answers with the error of a use case: its kind decides the status and its message is shown; any other error
 // is logged and answered as "internal error", so nothing internal leaks to the browser.
+// statusCertificate tells the sign-in page that the certificate of the site did not verify. No standard status says so; nginx uses this one.
+const statusCertificate = 495
+
 func (s *Server) fail(w http.ResponseWriter, err error) {
 	msg, ok := app.Message(err)
 	if !ok {
@@ -30,6 +33,7 @@ func (s *Server) fail(w http.ResponseWriter, err error) {
 		{app.ErrForbidden, http.StatusForbidden},
 		{app.ErrNotFound, http.StatusNotFound},
 		{app.ErrConflict, http.StatusConflict},
+		{app.ErrCertificate, statusCertificate}, // before ErrUnavailable: it is a kind of it
 		{app.ErrUnavailable, http.StatusServiceUnavailable},
 		{app.ErrPermanent, http.StatusUnprocessableEntity},
 	} {

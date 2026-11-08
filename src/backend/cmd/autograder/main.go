@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -126,7 +127,7 @@ func seedExport(ctx context.Context, dsn, moodleCourse string) error {
 		return err
 	}
 	defer store.Close()
-	site, err := moodleSite(ctx, store)
+	site, _, err := moodleSite(ctx, store)
 	if err != nil {
 		return err
 	}
@@ -140,21 +141,22 @@ func seedExport(ctx context.Context, dsn, moodleCourse string) error {
 	return seedfiles.WriteTar(os.Stdout, id, c)
 }
 
-// moodleSite is the Moodle site of this installation: MOODLE_URL, or the one the first sign-in set; empty before it.
-func moodleSite(ctx context.Context, store *postgres.Store) (string, error) {
+// moodleSite is the Moodle site of this installation: MOODLE_URL, or the one the first sign-in set and whether its
+// certificate goes unchecked; empty before it.
+func moodleSite(ctx context.Context, store *postgres.Store) (string, bool, error) {
 	if site := strings.TrimRight(os.Getenv("MOODLE_URL"), "/"); site != "" {
-		return site, nil
+		return site, false, nil
 	}
 
 	return store.MoodleSite(ctx)
 }
 
 // waitForSite returns the Moodle site once the first sign-in has set it.
-func waitForSite(ctx context.Context, store *postgres.Store) (string, error) {
+func waitForSite(ctx context.Context, store *postgres.Store) (string, bool, error) {
 	for waited := false; ; waited = true {
-		site, err := moodleSite(ctx, store)
+		site, skipVerify, err := moodleSite(ctx, store)
 		if err != nil || site != "" {
-			return site, err
+			return site, skipVerify, err
 		}
 
 		if !waited {
@@ -163,7 +165,7 @@ func waitForSite(ctx context.Context, store *postgres.Store) (string, error) {
 
 		select {
 		case <-ctx.Done():
-			return "", ctx.Err()
+			return "", false, ctx.Err()
 		case <-time.After(2 * time.Second):
 		}
 	}
@@ -172,16 +174,27 @@ func waitForSite(ctx context.Context, store *postgres.Store) (string, error) {
 // firstSite keeps the site of the first sign-in and switches the web server over to it.
 type firstSite struct {
 	store *postgres.Store
-	then  func(site string)
+	then  func(site string, skipVerify bool)
 }
 
-func (f firstSite) SetMoodleSite(ctx context.Context, url string) (string, error) {
-	kept, err := f.store.SetMoodleSite(ctx, url)
+func (f firstSite) SetMoodleSite(ctx context.Context, url string, skipVerify bool) (string, error) {
+	kept, keptSkip, err := f.store.SetMoodleSite(ctx, url, skipVerify)
 	if err == nil {
-		f.then(kept)
+		f.then(kept, keptSkip)
 	}
 
 	return kept, err
+}
+
+// moodleGateway is the Moodle site of this installation as the use cases see it.
+func moodleGateway(site string, skipVerify bool) *moodle.Gateway {
+	opts := localOptions
+	if skipVerify {
+		slog.Warn("the certificate of the Moodle site is not verified", "site", site)
+		opts = append(slices.Clone(opts), moodle.WithoutCertificateCheck())
+	}
+
+	return &moodle.Gateway{URL: site, Opts: opts}
 }
 
 // services is what every role connects to. The composition root: every use case gets its adapters in this file, by hand.
@@ -264,14 +277,14 @@ func runWeb(ctx context.Context, dsn string) error {
 		return err
 	}
 
-	site, err := moodleSite(ctx, s.store)
+	site, skipVerify, err := moodleSite(ctx, s.store)
 	if err != nil {
 		return err
 	}
 
 	cookieSecure := env("COOKIE_SECURE", "1") == "1"
-	forSite := func(site string) http.Handler {
-		mdl := &moodle.Gateway{URL: site, Opts: localOptions}
+	forSite := func(site string, skipVerify bool) http.Handler {
+		mdl := moodleGateway(site, skipVerify)
 		api := &httpapi.Server{
 			Access: &access.Service{Store: s.store, Moodle: mdl, Site: site}, Courses: &courses.Service{Store: s.store, Moodle: mdl, Runs: s.background, Site: site},
 			Syncing: &syncing.Service{Store: s.store, Runner: s.background}, Grading: &grading.Service{Store: s.store, Moodle: mdl, Runner: s.background, MoodleURL: site},
@@ -284,9 +297,9 @@ func runWeb(ctx context.Context, dsn string) error {
 	var web atomic.Pointer[http.Handler] // the sign-in of a new installation, then the whole API of its site
 	use := func(h http.Handler) { web.Store(&h) }
 	if site != "" {
-		use(forSite(site))
+		use(forSite(site, skipVerify))
 	} else {
-		first := &httpapi.Server{Access: &access.Service{Store: s.store, Moodle: &moodle.Gateway{Opts: localOptions}, Sites: firstSite{s.store, func(site string) { use(forSite(site)) }}}, Sealer: sealer, CookieSecure: cookieSecure}
+		first := &httpapi.Server{Access: &access.Service{Store: s.store, Moodle: &moodle.Gateway{Opts: localOptions}, Unchecked: &moodle.Gateway{Opts: append(slices.Clone(localOptions), moodle.WithoutCertificateCheck())}, Sites: firstSite{s.store, func(site string, skipVerify bool) { use(forSite(site, skipVerify)) }}}, Sealer: sealer, CookieSecure: cookieSecure}
 		use(first.SignInHandler())
 		slog.Info("no Moodle site yet: the first sign-in sets it")
 	}
@@ -319,12 +332,12 @@ func runMoodleWorker(ctx context.Context, dsn string) error {
 		return err
 	}
 
-	site, err := waitForSite(ctx, s.store)
+	site, skipVerify, err := waitForSite(ctx, s.store)
 	if err != nil {
 		return err
 	}
 
-	mdl := &moodle.Gateway{URL: site, Opts: localOptions}
+	mdl := moodleGateway(site, skipVerify)
 	seeds := &seeding.Service{Store: s.store, Source: seedfiles.Dir(env("SEED_DIR", "")), Prompts: llm.Catalog{}, Site: site}
 	acts := &workflows.Activities{Syncing: &syncing.Service{Store: s.store, Moodle: mdl, Uploads: s.uploads, Seeds: seeds}, Grading: &grading.Service{Store: s.store, Moodle: mdl, MoodleURL: site}, Sealer: sealer}
 	return workflows.RunWorkers(ctx, s.temporal, acts, workflows.MoodleQueues)

@@ -11,13 +11,14 @@ import (
 // Kinds of errors. A use case returns them through Fail with a message the user may see; delivery turns the kind into
 // an HTTP status or tells Temporal not to retry. Any other error is internal: logged, never shown.
 var (
-	ErrInvalid      = errors.New("invalid")           // the request breaks a rule: HTTP 422, not retried
-	ErrUnauthorized = errors.New("unauthorized")      // Moodle did not accept the login or the token: HTTP 401
-	ErrForbidden    = errors.New("forbidden")         // no right to do it: HTTP 403, not retried
-	ErrNotFound     = errors.New("not found")         // HTTP 404, not retried
-	ErrConflict     = errors.New("conflict")          // the state does not allow it now: HTTP 409
-	ErrUnavailable  = errors.New("unavailable")       // Moodle or the model server cannot be reached or is off: HTTP 502/503
-	ErrPermanent    = errors.New("permanent failure") // retrying cannot help (a broken prompt template, a foreign file URL)
+	ErrInvalid      = errors.New("invalid")                         // the request breaks a rule: HTTP 422, not retried
+	ErrUnauthorized = errors.New("unauthorized")                    // Moodle did not accept the login or the token: HTTP 401
+	ErrForbidden    = errors.New("forbidden")                       // no right to do it: HTTP 403, not retried
+	ErrNotFound     = errors.New("not found")                       // HTTP 404, not retried
+	ErrConflict     = errors.New("conflict")                        // the state does not allow it now: HTTP 409
+	ErrUnavailable  = errors.New("unavailable")                     // Moodle or the model server cannot be reached or is off: HTTP 502/503
+	ErrPermanent    = errors.New("permanent failure")               // retrying cannot help (a broken prompt template, a foreign file URL)
+	ErrCertificate  = fmt.Errorf("certificate: %w", ErrUnavailable) // the TLS certificate of a Moodle site does not verify, a kind of ErrUnavailable: HTTP 495
 )
 
 // Error is a failure with a message for the user; errors.Is(err, app.ErrConflict) finds its kind.

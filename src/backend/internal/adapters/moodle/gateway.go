@@ -2,6 +2,7 @@ package moodle
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"html"
 	"strings"
@@ -80,6 +81,10 @@ func (g *Gateway) SiteInfo(ctx context.Context, site, token string) (access.Site
 func signInError(site string, err error) error {
 	if _, ok := errors.AsType[*Error](err); ok || err == nil {
 		return err
+	}
+
+	if _, ok := errors.AsType[*tls.CertificateVerificationError](err); ok {
+		return app.Fail(app.ErrCertificate, "the certificate of %s could not be verified", site)
 	}
 
 	return app.Fail(app.ErrUnavailable, "%s does not answer like a Moodle site that allows the Moodle app", site)

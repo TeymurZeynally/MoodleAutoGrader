@@ -80,7 +80,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const api = {
   site: () => call<{ url: string }>('GET', '/api/site'),
-  login: (creds: { site?: string; token?: string; username?: string; password?: string }) => call<{ name: string; site: string }>('POST', '/api/login', creds),
+  login: (creds: { site?: string; token?: string; username?: string; password?: string; skip_verify?: boolean }) => call<{ name: string; site: string }>('POST', '/api/login', creds),
   logout: () => call<void>('POST', '/api/logout'),
   me: () => call<{ user_id: number; name: string }>('GET', '/api/me'),
   courses: (available = false) => call<Course[]>('GET', `/api/courses${available ? '?available=1' : ''}`),

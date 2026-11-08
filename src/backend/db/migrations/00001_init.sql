@@ -171,9 +171,10 @@ create table settings.prompt_overrides (
 );
 
 create table settings.site (
-    id     boolean primary key default true check (id),
-    url    text not null,
-    set_at timestamptz not null default now()
+    id              boolean primary key default true check (id),
+    url             text not null,
+    set_at          timestamptz not null default now(),
+    skip_tls_verify boolean not null default false -- the teacher chose it at the first sign-in, after the check of the certificate failed
 );
 
 create table integrity.code_fragments (
