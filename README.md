@@ -49,7 +49,18 @@ Open **http://autograder.localhost:8180**, enter the address of your Moodle site
 
 Connect a course and press **Sync now**: the grade sheet, the plagiarism check, the file viewer and publishing all work now.
 
-**2. Add AI models**
+**2. Turn on the GPU**
+
+By default the models run on the CPU. With an NVIDIA card and [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html):
+
+```bash
+echo 'COMPOSE_FILE=docker-compose.yml:compose.gpu.yml' >> .env
+docker compose up -d
+```
+
+While a model is working, `docker compose exec ollama ollama ps` shows where it runs. `100% GPU` is what you want; a split such as `30%/70% CPU/GPU` means the model and its context do not fit into the video memory, see [Models](#models).
+
+**3. Add AI models**
 
 ```bash
 docker compose run --rm ollama-cli pull gemma4:e4b
@@ -57,7 +68,7 @@ docker compose run --rm ollama-cli pull gemma4:e4b
 
 Then, in the course: **AI prompts** tab → choose the model for each step → **Sync now**. On the assignment page the generated checklist appears: edit it if you like, press **Approve checklist**, then **Re-analyze all**.
 
-A GPU is optional: on the CPU the check is just slower. See [Models](#models) for a GPU and other models.
+Other models and their settings: [Models](#models).
 
 ## Screenshots
 
@@ -109,7 +120,7 @@ Any model from the [Ollama library](https://ollama.com/search) can be used. Choo
 | Checklist check | marks every criterion with a quote | the larger, the better |
 | Comment | writes the comment for the student | any model |
 
-- **A GPU** (NVIDIA, with [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)): set `COMPOSE_FILE=docker-compose.yml:compose.gpu.yml` in `deploy/.env` and run `docker compose up -d`.
+- **A GPU** is turned on in step 2 of the quick start. If part of a model stays on the CPU, it does not fit into the video memory with its context: lower `num_ctx` in `deploy/seed/models.json`, or add `OLLAMA_FLASH_ATTENTION=1` and `OLLAMA_KV_CACHE_TYPE=q4_0` to `deploy/.env` and run `docker compose up -d`.
 - **One model is loaded at a time**: different models per step cost loading time on every work.
 - **Generation options** for your hardware (context size, temperature and so on) go to `deploy/seed/models.json`, see `deploy/seed.example/models.json`; `"*"` applies to every model. After a change: `docker compose restart app worker-core`.
 - **A deleted model** that a course still uses is reported on the assignment page, with the command to download it.

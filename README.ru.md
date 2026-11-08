@@ -49,7 +49,18 @@ docker compose up -d --build
 
 Подключите курс и нажмите **Sync now**: ведомость, проверка на плагиат, просмотр файлов и публикация оценок уже работают.
 
-**2. Добавление AI-моделей**
+**2. Включение видеокарты**
+
+По умолчанию модели работают на процессоре. Если есть видеокарта NVIDIA и установлен [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html):
+
+```bash
+echo 'COMPOSE_FILE=docker-compose.yml:compose.gpu.yml' >> .env
+docker compose up -d
+```
+
+Пока модель работает, `docker compose exec ollama ollama ps` показывает, где она выполняется. Нужно `100% GPU`; значение вроде `30%/70% CPU/GPU` означает, что модель вместе с контекстом не помещается в видеопамять, см. раздел [Модели](#модели).
+
+**3. Добавление AI-моделей**
 
 ```bash
 docker compose run --rm ollama-cli pull gemma4:e4b
@@ -57,7 +68,7 @@ docker compose run --rm ollama-cli pull gemma4:e4b
 
 Дальше в курсе: вкладка **AI prompts** → выберите модель для каждого шага → **Sync now**. На странице задания появится чек-лист, составленный моделью: при необходимости поправьте его, нажмите **Approve checklist**, а затем **Re-analyze all**.
 
-Видеокарта не обязательна: на процессоре проверка просто идёт медленнее. Подробнее о видеокартах и других моделях в разделе [Модели](#модели).
+Другие модели и их настройки описаны в разделе [Модели](#модели).
 
 ## Скриншоты
 
@@ -109,7 +120,7 @@ docker compose run --rm ollama-cli rm <model>     # удалить
 | Проверка по чек-листу | отмечает каждый критерий с цитатой | чем больше модель, тем лучше |
 | Комментарий | пишет комментарий для студента | любая модель |
 
-- **Видеокарта** (NVIDIA, нужен [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)): пропишите `COMPOSE_FILE=docker-compose.yml:compose.gpu.yml` в `deploy/.env` и выполните `docker compose up -d`.
+- **Видеокарта** включается на шаге 2 быстрого старта. Если часть модели осталась на процессоре, модель вместе с контекстом не помещается в видеопамять: уменьшите `num_ctx` в `deploy/seed/models.json` или добавьте в `deploy/.env` строки `OLLAMA_FLASH_ATTENTION=1` и `OLLAMA_KV_CACHE_TYPE=q4_0` и выполните `docker compose up -d`.
 - **В памяти одновременно одна модель**, поэтому разные модели на разных шагах означают лишнее время на загрузку для каждой работы.
 - **Параметры генерации** под ваше оборудование (размер контекста, температура и т. д.) задаются в `deploy/seed/models.json`, пример лежит в `deploy/seed.example/models.json`; ключ `"*"` действует на все модели. После изменения: `docker compose restart app worker-core`.
 - **Если модель удалена**, а курс её ещё использует, на странице задания появится предупреждение с командой для скачивания.
