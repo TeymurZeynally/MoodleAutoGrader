@@ -33,6 +33,7 @@ import (
 	_ "time/tzdata" // the distroless image has no zoneinfo; TZ sets local time for student comments.
 
 	"moodle-autograder/internal/adapters/dolos"
+	"moodle-autograder/internal/adapters/extract"
 	"moodle-autograder/internal/adapters/filestore"
 	"moodle-autograder/internal/adapters/llm"
 	"moodle-autograder/internal/adapters/moodle"
@@ -76,6 +77,16 @@ func run(args []string) error {
 		return errUsage
 	}
 
+	if args[0] == extract.ChildCommand {
+		return extract.Serve(os.Stdin, os.Stdout)
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("find this program: %w", err)
+	}
+
+	extract.Isolate(exe) // archives and Word documents are unpacked in a child process, killed when it hangs
 	dsn, err := databaseURL()
 	if err != nil {
 		return err

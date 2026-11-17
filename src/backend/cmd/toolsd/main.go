@@ -55,6 +55,21 @@ type page struct {
 }
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == extract.ChildCommand {
+		if err := extract.Serve(os.Stdin, os.Stdout); err != nil {
+			slog.Error("unpacking failed", "err", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		slog.Error("tools stopped", "err", err)
+		os.Exit(1)
+	}
+
+	extract.Isolate(exe) // archives and Word documents are unpacked in a child process, killed when it hangs
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 	mux.HandleFunc("POST /pdf/pages", pages)
@@ -153,7 +168,7 @@ func docxText(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"text": extract.DocxText(body)})
+	_ = json.NewEncoder(w).Encode(map[string]string{"text": extract.DocxText(r.Context(), body)})
 }
 
 // pdfText reads the text of a PDF a person sees; what does not fit into maxText is cut. "hidden" counts the lines left

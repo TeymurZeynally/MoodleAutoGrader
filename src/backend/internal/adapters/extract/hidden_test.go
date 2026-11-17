@@ -52,7 +52,7 @@ func TestWordTextAPersonDoesNotSeeIsLeftOutAndFlagged(t *testing.T) {
 		"hidden switched off":           {para(`<w:rPr><w:vanish w:val="0"/></w:rPr>`, "Visible words"), "", false},
 	} {
 		var s work.Snapshot
-		text := docxText(docx(t, para(`<w:rPr><w:color w:val="000000"/></w:rPr>`, "Report of the lab.")+c.body, c.styles), &s)
+		text := docxText(t.Context(), docx(t, para(`<w:rPr><w:color w:val="000000"/></w:rPr>`, "Report of the lab.")+c.body, c.styles), &s)
 		flagged := slices.Contains(s.Flags, work.FlagHiddenText)
 		if flagged != c.hidden || strings.Contains(text, "Secret") || !strings.Contains(text, "Report of the lab.") {
 			t.Errorf("%s: flagged %v, text %q", name, flagged, text)

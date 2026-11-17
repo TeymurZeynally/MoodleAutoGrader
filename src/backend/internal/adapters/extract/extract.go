@@ -7,8 +7,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
+	"maps"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -71,6 +74,9 @@ var DefaultProfile = NewProfile(course.Defaults().CodeExtensions, course.Default
 
 // IsCode reports whether a file is read as source code.
 func (p Profile) IsCode(name string) bool { return p.code[strings.ToLower(path.Ext(name))] }
+
+// ignoredDirs are the folders left out, for a child process.
+func (p Profile) ignoredDirs() []string { return slices.Collect(maps.Keys(p.ignored)) }
 
 // Skipped reports whether a path is inside build output or dependencies.
 func (p Profile) Skipped(name string) bool {
@@ -135,7 +141,7 @@ func (r reading) file(ctx context.Context, name, kind string, data []byte) {
 			s.Report += text + "\n"
 		}
 	case "docx":
-		if text := docxText(data, s); r.fits(len(text)) {
+		if text := docxText(ctx, data, s); r.fits(len(text)) {
 			s.Report += text + "\n"
 		}
 	case "exe":
@@ -154,30 +160,51 @@ func (r reading) file(ctx context.Context, name, kind string, data []byte) {
 	}
 }
 
+// archive reads the files of an archive, unpacked in a child process (see Isolate).
 func (r reading) archive(ctx context.Context, name string, data []byte) {
-	s := r.s
-	format, _, err := archives.Identify(ctx, name, bytes.NewReader(data))
-	ex, ok := format.(archives.Extractor)
-	if err != nil || !ok {
-		s.Flag(work.FlagUnreadable)
-		return
+	res, err := unpack(ctx, job{Op: opAll, Name: name, Data: data, Skip: r.prof.ignoredDirs(), Limits: r.lim}, func(f unpacked) {
+		switch kind := sniff(f.Body); kind {
+		case "zip", "rar", "7z":
+			r.s.Flag(work.FlagNestedArchive) // not unpacked: limits nesting bombs
+		default:
+			r.file(ctx, f.Path, kind, f.Body)
+		}
+	})
+	if err != nil {
+		slog.Warn("an archive could not be unpacked", "err", err)
+		r.s.Flag(work.FlagUnreadable)
 	}
 
+	for _, f := range res.Flags {
+		r.s.Flag(f)
+	}
+}
+
+// unpackAll gives send every file of an archive within the limits, outside the folders left out, and returns the flags.
+func unpackAll(ctx context.Context, j job, send func(unpacked) error) []string {
+	format, _, err := archives.Identify(ctx, j.Name, bytes.NewReader(j.Data))
+	ex, ok := format.(archives.Extractor)
+	if err != nil || !ok {
+		return []string{work.FlagUnreadable}
+	}
+
+	var flags []string
+	skip := NewProfile(nil, j.Skip)
 	var entries int
 	var total int64
-	err = ex.Extract(ctx, bytes.NewReader(data), func(_ context.Context, f archives.FileInfo) error {
+	err = ex.Extract(ctx, bytes.NewReader(j.Data), func(_ context.Context, f archives.FileInfo) error {
 		if f.IsDir() {
 			return nil
 		}
-		if entries++; entries > r.lim.MaxEntries {
+		if entries++; entries > j.Limits.MaxEntries {
 			return errLimit
 		}
-		clean := path.Clean("/" + strings.ReplaceAll(f.NameInArchive, `\`, "/"))[1:]
-		if f.LinkTarget != "" || f.Mode().Type() != 0 || clean != strings.TrimPrefix(strings.ReplaceAll(f.NameInArchive, `\`, "/"), "./") || strings.HasPrefix(f.NameInArchive, "/") {
-			s.Flag(work.FlagUnsafePath)
+		clean, safe := safePath(f)
+		if !safe {
+			flags = append(flags, work.FlagUnsafePath)
 			return nil
 		}
-		if r.prof.Skipped(clean) || f.Size() > r.lim.MaxFileBytes {
+		if skip.Skipped(clean) || f.Size() > j.Limits.MaxFileBytes {
 			return nil
 		}
 		rc, err := f.Open()
@@ -185,27 +212,24 @@ func (r reading) archive(ctx context.Context, name string, data []byte) {
 			return nil
 		}
 		defer rc.Close()
-		body, err := io.ReadAll(io.LimitReader(rc, r.lim.MaxFileBytes+1))
-		if err != nil || int64(len(body)) > r.lim.MaxFileBytes {
+		body, err := io.ReadAll(io.LimitReader(rc, j.Limits.MaxFileBytes+1))
+		if err != nil || int64(len(body)) > j.Limits.MaxFileBytes {
 			return nil
 		}
 		// The bytes really read: an archive may not state the size of a file, or state a wrong one.
-		if total += int64(len(body)); total > r.lim.MaxTotalBytes {
+		if total += int64(len(body)); total > j.Limits.MaxTotalBytes {
 			return errLimit
 		}
-		switch kind := sniff(body); kind {
-		case "zip", "rar", "7z":
-			s.Flag(work.FlagNestedArchive) // not unpacked: limits nesting bombs
-		default:
-			r.file(ctx, clean, kind, body)
-		}
-		return nil
+		return send(unpacked{clean, body})
 	})
-	if errors.Is(err, errLimit) {
-		s.Flag(work.FlagArchiveLimit)
-	} else if err != nil {
-		s.Flag(work.FlagUnreadable)
+	switch {
+	case errors.Is(err, errLimit):
+		flags = append(flags, work.FlagArchiveLimit)
+	case err != nil:
+		flags = append(flags, work.FlagUnreadable)
 	}
+
+	return flags
 }
 
 var errLimit = errors.New("archive limit exceeded")
@@ -231,21 +255,41 @@ func sniff(b []byte) string {
 }
 
 // docxText reads the paragraph text of word/document.xml a person sees; macros are flagged, never executed. Text a person
-// does not see is left out and flagged (see wordText).
-func docxText(data []byte, s *work.Snapshot) string {
-	ctx := context.Background()
+// does not see is left out and flagged (see wordText). The document is unpacked in a child process (see Isolate).
+func docxText(ctx context.Context, data []byte, s *work.Snapshot) string {
+	res, err := unpack(ctx, job{Op: opDocx, Data: data}, nil)
+	if err != nil {
+		slog.Warn("a Word document could not be unpacked", "err", err)
+		s.Flag(work.FlagUnreadable)
+		return ""
+	}
+
+	for _, f := range res.Flags {
+		s.Flag(f)
+	}
+
+	text, hidden := wordText(res.Body, readStyles(res.Styles))
+	if hidden {
+		s.Flag(work.FlagHiddenText)
+	}
+
+	return text
+}
+
+// docxParts unpacks the two parts of a Word document that hold its text, in the child process; a macro project is
+// flagged, never run.
+func docxParts(ctx context.Context, data []byte) (document, styles []byte, flags []string) {
 	format, _, err := archives.Identify(ctx, "x.zip", bytes.NewReader(data))
 	ex, ok := format.(archives.Extractor)
 	if err != nil || !ok {
-		s.Flag(work.FlagUnreadable)
-		return ""
+		return nil, nil, []string{work.FlagUnreadable}
 	}
 
 	parts := map[string][]byte{}
 	_ = ex.Extract(ctx, bytes.NewReader(data), func(_ context.Context, f archives.FileInfo) error {
 		switch name := strings.ToLower(f.NameInArchive); {
 		case strings.HasSuffix(name, "vbaproject.bin"):
-			s.Flag(work.FlagMacros)
+			flags = append(flags, work.FlagMacros)
 		case (name == "word/document.xml" || name == "word/styles.xml") && f.Size() < 20<<20:
 			rc, err := f.Open()
 			if err != nil {
@@ -256,12 +300,8 @@ func docxText(data []byte, s *work.Snapshot) string {
 		}
 		return nil
 	})
-	text, hidden := wordText(parts["word/document.xml"], readStyles(parts["word/styles.xml"]))
-	if hidden {
-		s.Flag(work.FlagHiddenText)
-	}
 
-	return text
+	return parts["word/document.xml"], parts["word/styles.xml"], flags
 }
 
 // Zero-width and direction marks; a BOM at the very start of a file is normal (Visual Studio writes one) and ignored.

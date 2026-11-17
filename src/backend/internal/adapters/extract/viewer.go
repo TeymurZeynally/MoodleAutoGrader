@@ -54,6 +54,25 @@ func IsArchive(data []byte) bool {
 func List(ctx context.Context, name string, data []byte, inner []string, prof Profile) ([]Entry, error) {
 	ctx, cancel := context.WithTimeout(ctx, viewTimeout)
 	defer cancel()
+	res, err := unpack(ctx, job{Op: opList, Name: name, Data: data, Inner: inner, Skip: prof.ignoredDirs()}, nil)
+	if err != nil {
+		return nil, viewError(ctx, err)
+	}
+
+	return res.Entries, res.err()
+}
+
+// viewError is the failure of a child process unpacking for the viewer.
+func viewError(ctx context.Context, err error) error {
+	if ctx.Err() != nil {
+		return errors.New("archive took too long to read")
+	}
+
+	return fmt.Errorf("read archive: %w", err)
+}
+
+// list is List in the child process.
+func list(ctx context.Context, name string, data []byte, inner []string, prof Profile) ([]Entry, error) {
 	data, name, err := descend(ctx, name, data, inner)
 	if err != nil {
 		return nil, err
@@ -98,10 +117,18 @@ func List(ctx context.Context, name string, data []byte, inner []string, prof Pr
 
 // Open returns one file: the upload itself (no inner path) or an entry at the end of the inner path.
 func Open(ctx context.Context, name string, data []byte, inner []string) ([]byte, string, error) {
+	if len(inner) == 0 {
+		return data, name, nil
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, viewTimeout)
 	defer cancel()
-	data, name, err := descend(ctx, name, data, inner)
-	return data, name, err
+	res, err := unpack(ctx, job{Op: opOpen, Name: name, Data: data, Inner: inner}, nil)
+	if err != nil {
+		return nil, "", viewError(ctx, err)
+	}
+
+	return res.Body, res.Name, res.err()
 }
 
 // descend follows inner archive paths; each step unpacks exactly one entry with the size limit.
@@ -252,9 +279,11 @@ func Detect(name string, data []byte) (string, string) {
 }
 
 // DocxText returns the text of a Word document for the viewer.
-func DocxText(data []byte) string {
+func DocxText(ctx context.Context, data []byte) string {
+	ctx, cancel := context.WithTimeout(ctx, viewTimeout)
+	defer cancel()
 	var s work.Snapshot
-	return docxText(data, &s)
+	return docxText(ctx, data, &s)
 }
 
 const maxImageBytes = 6 << 20
