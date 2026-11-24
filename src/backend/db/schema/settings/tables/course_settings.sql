@@ -19,7 +19,9 @@ CREATE TABLE settings.course_settings (
     template_min_works integer,
     template_share numeric,
     code_extensions text[],
-    ignored_dirs text[]
+    ignored_dirs text[],
+    download_files boolean DEFAULT true NOT NULL,
+    ai_check boolean DEFAULT true NOT NULL
 );
 
 ALTER TABLE ONLY settings.course_settings

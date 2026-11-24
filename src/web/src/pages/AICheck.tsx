@@ -197,7 +197,7 @@ export function ChecklistCard({ assignmentId, onChanged, queued = 0, failed = 0,
         text="The failed works are checked again with the current checklist on the models below; the results become the current ones and go into the drafts. The course models do not change." />
       <Popconfirm title="Generate a new checklist from the assignment description?" description={c?.checklist?.source === 'teacher' ? 'Your edited checklist will be replaced. Works are not analyzed until you run “Re-analyze all”.' : 'Works are not analyzed until you run “Re-analyze all”.'} onConfirm={() => run(true, true)}><Button size="small" disabled={c?.running}>New checklist</Button></Popconfirm>
     </Flex>}>
-      {c?.models_problem && <Alert type="warning" showIcon style={{ marginBottom: 8 }} title="The AI check cannot run yet" description={c.models_problem} />}
+      {c?.models_problem && <Alert type="warning" showIcon style={{ marginBottom: 8 }} title="The AI check cannot run" description={c.models_problem} />}
       {c?.running && p && <Flex gap={12} align="center" style={{ marginBottom: 8 }}>
         <Typography.Text>{p.stage === 'EnsureRubric' ? 'Preparing the checklist…' : `Analyzing works: ${p.Done} of ${p.Total}`}</Typography.Text>
         <Progress percent={p.Total ? Math.floor((100 * p.Done) / p.Total) : 0} size="small" style={{ flex: 1, maxWidth: 400 }} status="active" />

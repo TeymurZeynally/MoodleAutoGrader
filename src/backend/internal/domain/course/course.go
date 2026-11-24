@@ -23,6 +23,7 @@ type Settings struct {
 	ExtrasEnabled bool `json:"extras_enabled"` // checklists have extra tasks, checked but not scored
 
 	// AI check.
+	AICheck       bool    `json:"ai_check"`       // off: no work of the course is analyzed and no checklist is built
 	MaxImages     int     `json:"max_images"`     // pictures of one work the model reads: PDF pages with images, screenshots
 	PartialCredit float64 `json:"partial_credit"` // share of a criterion's points for "partial", from 0 to 1
 	PointsStep    float64 `json:"points_step"`    // points of a generated checklist are rounded to this step
@@ -35,6 +36,7 @@ type Settings struct {
 	TemplateShare      float64 `json:"template_share"`       // code in more than this share of works is a template, from 0 to 1
 
 	// Files of a work.
+	DownloadFiles  bool     `json:"download_files"`  // off: a sync copies grades, comments and attempts only; no file is downloaded, read or checked
 	CodeExtensions []string `json:"code_extensions"` // files read as source code, e.g. ".cs"
 	IgnoredDirs    []string `json:"ignored_dirs"`    // build output and dependencies, left out everywhere, e.g. "bin"
 }
@@ -47,8 +49,9 @@ func Defaults() Settings {
 	return Settings{
 		TrackDeadlines: true, LatePenaltyEnabled: true, LatePenalty: 1, LateNotice: "Минус {points} за сдачу после дедлайна.",
 		RequireCode: true,
-		MaxImages:   16, PartialCredit: 0.5, PointsStep: 0.5,
+		AICheck:     true, MaxImages: 16, PartialCredit: 0.5, PointsStep: 0.5,
 		SimilarPercent: 50, CopyPercent: 75, CopyIdenticalFiles: 2, TemplateMinWorks: 10, TemplateShare: 0.5,
+		DownloadFiles: true,
 		CodeExtensions: []string{
 			".c", ".cjs", ".cpp", ".cs", ".cshtml", ".csproj", ".go", ".h", ".hpp", ".htm", ".html", ".java", ".js", ".jsx", ".kt", ".mjs",
 			".php", ".proto", ".py", ".razor", ".rb", ".rs", ".sql", ".svelte", ".swift", ".ts", ".tsx", ".vue",

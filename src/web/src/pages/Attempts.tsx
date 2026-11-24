@@ -13,6 +13,16 @@ export const attemptCount = (s: Submission) => Math.max(s.attempts.length, s.att
 // an attempt it reopened comes from the attempts.
 export const gradeInMoodle = (s: Submission) => s.attempts.find(a => a.attempt === s.attempt)?.grade ?? s.moodle_grade
 
+// firstOnTime is when a late work was first uploaded with files, if that was before the deadline: the student uploaded on
+// time and again later, e.g. after the teacher's comment. Null when the work is not late or the first upload was too.
+export const firstOnTime = (s: Submission) => {
+  const times = [...s.attempts.filter(a => a.files.length > 0).map(a => a.submitted_at), s.files.length > 0 ? s.submitted_at : null]
+    .filter((t): t is string => t !== null).map(t => new Date(t).getTime())
+
+  const first = times.length ? Math.min(...times) : null
+  return s.late && s.due_at !== null && first !== null && first <= new Date(s.due_at).getTime() ? new Date(first).toISOString() : null
+}
+
 // lastEarlier is the newest earlier attempt that has what is asked for.
 export const lastEarlier = (s: Submission, has: (a: Submission['attempts'][number]) => boolean) => s.attempts.filter(a => a.attempt < s.attempt && has(a)).at(-1)
 

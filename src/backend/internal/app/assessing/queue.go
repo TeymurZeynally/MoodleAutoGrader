@@ -99,6 +99,12 @@ func (s *Service) Rerun(ctx context.Context, userID, assignmentID int64, r Rerun
 		return false, err
 	}
 
+	if !r.ChecklistOnly {
+		if err := s.requireFiles(ctx, t.CourseID); err != nil {
+			return false, err
+		}
+	}
+
 	job := Job{AssignmentID: assignmentID, Force: true, NewChecklist: r.NewChecklist, ChecklistOnly: r.ChecklistOnly, IncludeGraded: r.IncludeGraded, Models: r.Models}
 	switch {
 	case r.FailedOnly:
@@ -111,6 +117,12 @@ func (s *Service) Rerun(ctx context.Context, userID, assignmentID int64, r Rerun
 		}
 		job.SubmissionIDs, job.NewChecklist, job.ChecklistOnly = ids, false, false
 	case len(r.SubmissionIDs) > 0:
+		// Chosen works are checked on the checklist the teacher has seen: without one, the check would build it unseen.
+		if _, ok, err := s.Store.LatestChecklist(ctx, assignmentID); err != nil {
+			return false, err
+		} else if !ok {
+			return false, app.Fail(app.ErrConflict, "%s has no checklist yet: build it on the page of the assignment first", t.Name)
+		}
 		ids, err := s.chosen(ctx, assignmentID, r.SubmissionIDs)
 		if err != nil {
 			return false, err
@@ -171,8 +183,26 @@ func (s *Service) startWork(ctx context.Context, submissionID int64, job Job) er
 		return err
 	}
 
+	if err := s.requireFiles(ctx, info.CourseID); err != nil {
+		return err
+	}
+
 	job.AssignmentID, job.SubmissionIDs = info.AssignmentID, []int64{submissionID}
 	return s.Runner.CheckWork(ctx, job)
+}
+
+// requireFiles refuses to check works whose files the course does not download.
+func (s *Service) requireFiles(ctx context.Context, courseID int64) error {
+	settings, err := s.Store.CourseSettings(ctx, courseID)
+	if err != nil {
+		return err
+	}
+
+	if !settings.DownloadFiles {
+		return app.Fail(app.ErrConflict, `this course does not download files: turn on "Download files" in its settings and sync`)
+	}
+
+	return nil
 }
 
 // Stop stops the check of an assignment and takes its works off the queue; finished results stay.

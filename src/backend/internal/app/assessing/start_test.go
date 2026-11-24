@@ -24,6 +24,9 @@ type startStore struct {
 	courseModel string
 	maxGrade    *float64
 	intro       string
+	noFiles     bool
+	noAI        bool
+	checklist   bool
 }
 
 func (f *startStore) ClearActivity(context.Context) error { return nil }
@@ -49,7 +52,7 @@ func (f *startStore) Submission(context.Context, int64) (work.Submission, error)
 }
 
 func (f *startStore) LatestChecklist(context.Context, int64) (assessment.Checklist, bool, error) {
-	return assessment.Checklist{}, false, nil
+	return assessment.Checklist{}, f.checklist, nil
 }
 
 func (f *startStore) AssignmentText(context.Context, int64) (work.Assignment, error) {
@@ -57,7 +60,9 @@ func (f *startStore) AssignmentText(context.Context, int64) (work.Assignment, er
 }
 
 func (f *startStore) CourseSettings(context.Context, int64) (course.Settings, error) {
-	return course.Defaults(), nil
+	c := course.Defaults()
+	c.DownloadFiles, c.AICheck = !f.noFiles, !f.noAI
+	return c, nil
 }
 
 type fakeRunner struct {
@@ -171,6 +176,47 @@ func TestASyncWithoutModelsQueuesNothingAndBuildsNothing(t *testing.T) {
 	}
 }
 
+func TestACourseWithTheAICheckOffBuildsNothingAndChecksNothing(t *testing.T) {
+	s, st, r := startService()
+	s.Assessors = func(_, _ map[string]string) Assessor { return fakeAssessor{} }
+	st.noAI, st.checklist, st.submitted = true, true, []int64{3}
+	st.maxGrade, st.intro = new(5.0), "Do the lab"
+	ctx := context.Background()
+	if ids, err := s.QueueWorks(ctx, Job{AssignmentID: 2, FromSync: true}); err != nil || ids != nil {
+		t.Fatalf("a sync queues nothing: %v %v", ids, err)
+	}
+
+	if _, err := s.Rerun(ctx, 1, 2, RerunRequest{SubmissionIDs: []int64{3}}); !errors.Is(err, app.ErrInvalid) || len(r.assignment) != 0 {
+		t.Fatalf("a request is refused: %v", err)
+	}
+
+	if err := s.Recheck(ctx, 7, nil); !errors.Is(err, app.ErrInvalid) || len(r.one) != 0 {
+		t.Fatalf("one work: %v", err)
+	}
+
+	page, err := s.Checklist(ctx, 2)
+	if err != nil || !strings.Contains(page.ModelsProblem, "AI check is off") {
+		t.Fatalf("the page says why: %+v %v", page.ModelsProblem, err)
+	}
+}
+
+func TestNoWorkIsCheckedWhereTheCourseDownloadsNoFiles(t *testing.T) {
+	s, st, r := startService()
+	st.noFiles = true
+	ctx := context.Background()
+	if _, err := s.Rerun(ctx, 1, 2, RerunRequest{}); !errors.Is(err, app.ErrConflict) || len(r.assignment) != 0 {
+		t.Fatalf("an assignment: %v %+v", err, r.assignment)
+	}
+
+	if err := s.Recheck(ctx, 7, nil); !errors.Is(err, app.ErrConflict) || len(r.one) != 0 {
+		t.Fatalf("one work: %v %+v", err, r.one)
+	}
+
+	if _, err := s.Rerun(ctx, 1, 2, RerunRequest{ChecklistOnly: true}); err != nil || len(r.assignment) != 1 {
+		t.Fatalf("a checklist needs only the description: %v %+v", err, r.assignment)
+	}
+}
+
 func TestRerunChecksEveryWorkAndAcceptsTheChecklist(t *testing.T) {
 	s, st, r := startService()
 	models := map[string]string{"check": "model-b:12b"}
@@ -212,6 +258,11 @@ func TestRerunOfFailedWorksTakesOnlyThem(t *testing.T) {
 func TestRerunOfChosenWorksTakesOnlyWorksOfTheAssignment(t *testing.T) {
 	s, st, r := startService()
 	st.submitted = []int64{3, 4, 5}
+	if err := rerun(context.Background(), s, 1, 2, RerunRequest{SubmissionIDs: []int64{3}}); !errors.Is(err, app.ErrConflict) || len(r.assignment) != 0 {
+		t.Fatalf("without a checklist the check would build one the teacher has not seen: %v", err)
+	}
+
+	st.checklist = true
 	if err := rerun(context.Background(), s, 1, 2, RerunRequest{SubmissionIDs: []int64{5, 3, 5}, NewChecklist: true}); err != nil {
 		t.Fatal(err)
 	}
@@ -345,6 +396,10 @@ type queueStore struct {
 	Store
 	ids, queued []int64
 	graded      bool
+}
+
+func (f *queueStore) CourseSettings(context.Context, int64) (course.Settings, error) {
+	return course.Defaults(), nil
 }
 
 func (f *queueStore) AssignmentText(context.Context, int64) (work.Assignment, error) {

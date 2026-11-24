@@ -81,3 +81,28 @@ func TestAWorkWithoutPointsStopsThePublication(t *testing.T) {
 		t.Fatalf("only the draft approved before the failure is marked: %v", st.failed)
 	}
 }
+
+type sheetStore struct {
+	Store
+	students []Student
+	rows     []Row
+}
+
+func (f sheetStore) Students(context.Context, int64) ([]Student, error) { return f.students, nil }
+
+func (f sheetStore) StudentSubmissions(context.Context, int64, int64) ([]Row, error) {
+	return f.rows, nil
+}
+
+func TestTheSheetOfAStudentLinksEachAssignmentInMoodle(t *testing.T) {
+	st := sheetStore{students: []Student{{ID: 4, Name: "Anna"}}, rows: []Row{{AssignmentID: 1, CMID: 10, MoodleUserID: 77}, {AssignmentID: 2, CMID: 11, MoodleUserID: 77}}}
+	s := &Service{Store: st, MoodleURL: "https://moodle.test"}
+	sheet, err := s.StudentSheet(context.Background(), 3, 4)
+	if err != nil || sheet.Student.Name != "Anna" || len(sheet.Submissions) != 2 || sheet.Submissions[1].GraderURL != "https://moodle.test/mod/assign/view.php?id=11&action=grader&userid=77" {
+		t.Fatalf("%+v %v", sheet, err)
+	}
+
+	if _, err := s.StudentSheet(context.Background(), 3, 5); !errors.Is(err, app.ErrNotFound) {
+		t.Fatalf("a student of another course: %v", err)
+	}
+}

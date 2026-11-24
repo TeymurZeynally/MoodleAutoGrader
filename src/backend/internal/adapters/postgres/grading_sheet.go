@@ -8,13 +8,24 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// The grade sheet of an assignment reads every schema: students and submissions (moodle), fingerprints and matches
+// The grade sheet, of an assignment or of a student, reads every schema: students and submissions (moodle), fingerprints and matches
 // (integrity), the AI check (ai) and drafts (grading).
 
+// Submissions is the sheet of an assignment: every enrolled student, plus anyone who submitted (also students who left
+// the course since), one row each.
 func (s *Store) Submissions(ctx context.Context, assignmentID int64) ([]grading.Row, error) {
-	// Every enrolled student, plus anyone who submitted (also students who left the course since), one row each: the
-	// newest attempt the student submitted, or the newest one if none is. A newer attempt not submitted yet is reported
-	// next to it: Moodle opens one by itself when a low grade is published, and it holds nothing to grade.
+	return s.sheet(ctx, assignmentID, 0, 0)
+}
+
+// StudentSubmissions is the sheet of one student: a row per assignment of the course, by deadline.
+func (s *Store) StudentSubmissions(ctx context.Context, courseID, studentID int64) ([]grading.Row, error) {
+	return s.sheet(ctx, 0, courseID, studentID)
+}
+
+// sheet reads the rows of an assignment, or with assignmentID 0 the rows of a student of a course. A row is the newest
+// attempt the student submitted, or the newest one if none is. A newer attempt not submitted yet is reported next to it:
+// Moodle opens one by itself when a low grade is published, and it holds nothing to grade.
+func (s *Store) sheet(ctx context.Context, assignmentID, courseID, studentID int64) ([]grading.Row, error) {
 	rows, err := s.db.Query(ctx, `select coalesce(s.id, 0), st.id, st.moodle_user_id, st.full_name, moodle.short_name(st.last_name, st.first_name, st.full_name),
 		st.enrolled, mg.grade::float8, mg.graded_at, st.groups, coalesce(s.moodle_status, 'none'), s.submitted_at,
 		coalesce((select array_agg(file_name order by id) from moodle.submission_files where submission_id = s.id), '{}'),
@@ -35,7 +46,8 @@ func (s *Store) Submissions(ctx context.Context, assignmentID int64) ([]grading.
 		coalesce((select jsonb_agg(x.j || jsonb_build_object('submission_id', w.id) order by (x.j->>'attempt')::int)
 			from moodle.moodle_attempts ma cross join lateral jsonb_array_elements(ma.attempts) as x(j)
 			left join moodle.submissions w on w.assignment_id = a.id and w.student_id = st.id and w.attempt = (x.j->>'attempt')::int
-			where ma.assignment_id = a.id and ma.moodle_user_id = st.moodle_user_id), '[]')
+			where ma.assignment_id = a.id and ma.moodle_user_id = st.moodle_user_id), '[]'),
+		a.id, a.name, a.due_at, a.max_grade::float8, a.cmid, exists(select 1 from ai.checklists c where c.assignment_id = a.id)
 		from moodle.assignments a join moodle.students st on st.course_id = a.course_id
 		left join lateral (select x.* from moodle.submissions x where x.assignment_id = a.id and x.student_id = st.id
 			order by x.moodle_status = 'submitted' desc, x.attempt desc limit 1) s on true
@@ -45,7 +57,8 @@ func (s *Store) Submissions(ctx context.Context, assignmentID int64) ([]grading.
 		left join grading.grade_drafts d on d.submission_id = s.id
 		left join moodle.moodle_grades mg on mg.assignment_id = a.id and mg.moodle_user_id = st.moodle_user_id
 		left join ai.assessments ass on ass.submission_id = s.id
-		where a.id = $1 and (st.enrolled or s.id is not null) order by st.groups, st.full_name`, assignmentID)
+		where (a.id = $1 or (a.course_id = $2 and st.id = $3)) and (st.enrolled or s.id is not null or st.id = $3)
+		order by st.groups, st.full_name, a.due_at nulls last, a.name`, assignmentID, courseID, studentID)
 	if err != nil {
 		return nil, wrap("list submissions", err)
 	}
@@ -62,7 +75,8 @@ func (s *Store) Submissions(ctx context.Context, assignmentID int64) ([]grading.
 		}
 		err := r.Scan(&x.ID, &x.StudentID, &x.MoodleUserID, &x.Student, &x.ShortName, &x.Enrolled, &x.MoodleGrade, &x.GradedAt, &x.Groups, &x.MoodleStatus, &x.SubmittedAt,
 			&x.Files, &x.Flags, &x.Integrity, &x.Points, &x.Comment, &x.Source, &x.Version, &x.State, &x.PublishError,
-			&ai.Status, &ai.Points, &ai.Met, &ai.Total, &ai.Extra, &ai.Score, &ai.Late, &x.Late, &x.Attempt, &x.Resubmitted, &x.OpenAttempt, &x.OpenStatus, &x.Attempts)
+			&ai.Status, &ai.Points, &ai.Met, &ai.Total, &ai.Extra, &ai.Score, &ai.Late, &x.Late, &x.Attempt, &x.Resubmitted, &x.OpenAttempt, &x.OpenStatus, &x.Attempts,
+			&x.AssignmentID, &x.Assignment, &x.DueAt, &x.MaxGrade, &x.CMID, &x.HasChecklist)
 		if ai.Status != nil {
 			x.AI = &grading.AISummary{Status: *ai.Status, Points: ai.Points, Met: ai.Met, Total: ai.Total, Extra: ai.Extra, Score: ai.Score, Late: ai.Late}
 		}
@@ -72,10 +86,17 @@ func (s *Store) Submissions(ctx context.Context, assignmentID int64) ([]grading.
 		return nil, wrap("scan submissions", err)
 	}
 
+	var ids []int64
+	for _, x := range subs {
+		if x.ID != 0 {
+			ids = append(ids, x.ID)
+		}
+	}
+
 	mrows, err := s.db.Query(ctx, `select m.submission_id, o.id, st.full_name, moodle.short_name(st.last_name, st.first_name, st.full_name), st.groups, o.submitted_at,
 		m.code_similarity, m.report_similarity, m.identical_files, m.severity
 		from integrity.integrity_matches m join moodle.submissions o on o.id = m.other_submission_id join moodle.students st on st.id = o.student_id
-		where m.assignment_id = $1 order by o.submitted_at nulls last`, assignmentID)
+		where m.submission_id = any($1) order by o.submitted_at nulls last`, ids)
 	if err != nil {
 		return nil, wrap("list matches", err)
 	}

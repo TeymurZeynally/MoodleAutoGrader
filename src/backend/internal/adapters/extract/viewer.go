@@ -73,12 +73,12 @@ func viewError(ctx context.Context, err error) error {
 
 // list is List in the child process.
 func list(ctx context.Context, name string, data []byte, inner []string, prof Profile) ([]Entry, error) {
-	data, name, err := descend(ctx, name, data, inner)
+	data, _, err := descend(ctx, name, data, inner)
 	if err != nil {
 		return nil, err
 	}
 
-	ex, err := extractor(ctx, name, data)
+	ex, err := extractor(data)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func descend(ctx context.Context, name string, data []byte, inner []string) ([]b
 	}
 
 	for _, p := range inner {
-		next, err := entry(ctx, name, data, p)
+		next, err := entry(ctx, data, p)
 		if err != nil {
 			return nil, "", err
 		}
@@ -148,8 +148,8 @@ func descend(ctx context.Context, name string, data []byte, inner []string) ([]b
 	return data, name, nil
 }
 
-func entry(ctx context.Context, name string, data []byte, want string) ([]byte, error) {
-	ex, err := extractor(ctx, name, data)
+func entry(ctx context.Context, data []byte, want string) ([]byte, error) {
+	ex, err := extractor(data)
 	if err != nil {
 		return nil, err
 	}
@@ -192,15 +192,10 @@ func entry(ctx context.Context, name string, data []byte, want string) ([]byte, 
 	return nil, ErrNotFound
 }
 
-func extractor(ctx context.Context, name string, data []byte) (archives.Extractor, error) {
-	if !IsArchive(data) {
+func extractor(data []byte) (archives.Extractor, error) {
+	ex, ok := archiveOf(data)
+	if !ok {
 		return nil, errors.New("not an archive")
-	}
-
-	format, _, err := archives.Identify(ctx, name, bytes.NewReader(data))
-	ex, ok := format.(archives.Extractor)
-	if err != nil || !ok {
-		return nil, errors.New("unsupported archive format")
 	}
 
 	return ex, nil

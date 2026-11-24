@@ -230,7 +230,21 @@ func (s *Service) Fetch(ctx context.Context, token string, userID, courseID int6
 	}
 
 	// Before the works are read and checked: the course's file rules and checklists apply to them already.
-	return plan, s.Seeds.Apply(ctx, courseID)
+	if err := s.Seeds.Apply(ctx, courseID); err != nil {
+		return plan, err
+	}
+
+	settings, err := s.Store.CourseSettings(ctx, courseID)
+	if err != nil {
+		return plan, err
+	}
+
+	if !settings.DownloadFiles {
+		// Grades, comments and attempts are copied; files stay in Moodle, so there is nothing to read or check.
+		plan.Assignments, plan.Download, plan.Process = nil, nil, nil
+	}
+
+	return plan, nil
 }
 
 func (s *Service) fetchAssignment(ctx context.Context, token string, courseID int64, as Assignment, names map[int64]string, groups map[int64][]string, comments map[int64]string, plan *Plan) error {

@@ -27,7 +27,7 @@ Grading a hundred lab works means opening a hundred archives, reading a hundred 
 - **Every submission in the browser.** PDF, archives (zip, rar, 7z, an archive inside an archive), source code with line numbers, images, Word documents. Nothing to download and unpack.
 - **An AI check against your checklist.** The model drafts a checklist from the assignment description, you edit and approve it. For each work the model marks every criterion and must quote the work as evidence; the code sums the points from these verdicts. Then the model suggests a comment for the student.
 - **Works that try to talk to the grader are caught.** A request for full marks in the report, the code or on a screenshot is found, quoted and not graded: the work is marked for you. Text a person does not see (hidden, white on white, tiny, invisible characters) is left out of the AI check and flagged.
-- **A grade sheet that does the bookkeeping.** Points, comments, integrity, AI result, late penalty, the grade already in Moodle, earlier attempts with their comments. Filters for what is left to do; publish a selection to Moodle in one click.
+- **A grade sheet that does the bookkeeping.** Points, comments, integrity, AI result, late penalty, the grade already in Moodle, earlier attempts with their comments. Filters for what is left to do; publish a selection to Moodle in one click. The **Students** tab of a course lists its students; the page of a student is the same sheet with every assignment of theirs, one row each, and a student's name in the sheet of an assignment leads there.
 - **Local and private.** Models run in [Ollama](https://ollama.com) on your machine, on the CPU or an NVIDIA GPU. No cloud service, no API key.
 - **For several teachers.** Everyone signs in with their own Moodle account and sees the courses where Moodle lets them grade.
 
@@ -151,7 +151,7 @@ Nothing has to be set. Optional settings go to `deploy/.env`: copy `.env.example
 | `OLLAMA_FLASH_ATTENTION`, `OLLAMA_KV_CACHE_TYPE` | | Ollama's own settings, to fit a larger context into video memory. |
 | `APP_UID`, `APP_GID` | `1000` | The user the application runs as and who owns `deploy/secrets`. |
 
-Passwords and keys are generated on the first start into `deploy/secrets`. Course settings (late penalty, similarity thresholds, file types, what counts as code) are on the **Settings** tab of each course.
+Passwords and keys are generated on the first start into `deploy/secrets`. Course settings (late penalty, similarity thresholds, file types, what counts as code) are on the **Settings** tab of each course. There **Download files** can be turned off: a sync then copies only the grades, comments and attempts, to look at and correct grades, and the file viewer, the similarity check and the AI check are off in that course. **AI check** can be turned off alone: the works are then graded without it, and the similarity check stays.
 
 ## Everyday commands
 
@@ -165,6 +165,8 @@ docker compose exec -T postgres pg_dump -U autograder -d autograder -Fc > autogr
 docker compose down                           # remove the containers, keep the data
 docker compose down -v                        # remove the data AND the downloaded models
 ```
+
+What changed in each version, and what to do after an update, is in [CHANGELOG.md](CHANGELOG.md).
 
 The files of students can be downloaded again from Moodle by a sync; the database holds what is yours: drafts, checklists, prompts, settings. After a database is lost, a sync brings back the grades and comments that are in Moodle.
 

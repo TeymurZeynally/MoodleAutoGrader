@@ -1,4 +1,5 @@
-// Package grading is the grade sheet of an assignment: drafts the teacher edits, approval and publishing to Moodle.
+// Package grading is the grade sheet, of an assignment or of one student: drafts the teacher edits, approval and
+// publishing to Moodle.
 // Only an approved snapshot of a draft is published, with the token of the teacher who approved it.
 package grading
 
@@ -7,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"moodle-autograder/internal/app"
@@ -21,6 +23,10 @@ type Moodle interface {
 type Store interface {
 	Assignment(ctx context.Context, assignmentID int64) (Header, error)
 	Submissions(ctx context.Context, assignmentID int64) ([]Row, error)
+	// Students lists the students of a course: the enrolled ones and those who left but submitted something.
+	Students(ctx context.Context, courseID int64) ([]Student, error)
+	// StudentSubmissions is the sheet of one student: a row per assignment of the course, by deadline.
+	StudentSubmissions(ctx context.Context, courseID, studentID int64) ([]Row, error)
 	MyGroups(ctx context.Context, userID, courseID int64) ([]string, error)
 	// UpdateDraft saves the teacher's points and comment; app.ErrConflict when the draft changed since version.
 	UpdateDraft(ctx context.Context, submissionID, userID int64, points *float64, comment string, version int) error
@@ -76,9 +82,17 @@ type AttemptInfo struct {
 	SubmissionID *int64     `json:"submission_id"` // the work here, to open its files; nil until it is copied
 }
 
-// Row is one student of the sheet, with or without a submission.
+// Row is one student on one assignment, with or without a submission: a row of the sheet of an assignment (a row per
+// student) or of a student (a row per assignment).
 type Row struct {
 	ID           int64      `json:"id"` // 0 when the student has no submission
+	AssignmentID int64      `json:"assignment_id"`
+	Assignment   string     `json:"assignment"` // its name
+	DueAt        *time.Time `json:"due_at"`
+	MaxGrade     *float64   `json:"max_grade"`
+	CMID         int64      `json:"-"`
+	GraderURL    string     `json:"moodle_grader_url"` // the grading page of this student on this assignment in Moodle
+	HasChecklist bool       `json:"has_checklist"`     // the assignment has a checklist: its works can be analyzed again
 	StudentID    int64      `json:"student_id"`
 	MoodleUserID int64      `json:"moodle_user_id"`
 	Student      string     `json:"student"`
@@ -157,7 +171,24 @@ type Sheet struct {
 	Assignment  Header   `json:"assignment"`
 	Submissions []Row    `json:"submissions"`
 	MyGroups    []string `json:"my_groups"`
-	GraderURL   string   `json:"moodle_grader_url"` // the assignment's grader page in Moodle; the UI adds &userid=
+}
+
+// Student is a student of a course with a count of their works: what the list of students shows.
+type Student struct {
+	ID        int64    `json:"id"`
+	Name      string   `json:"name"`
+	ShortName string   `json:"short_name"`
+	Groups    []string `json:"groups"`
+	Enrolled  bool     `json:"enrolled"`
+	Submitted int      `json:"submitted"` // assignments with a submitted work
+	Graded    int      `json:"graded"`    // assignments with a grade in the Moodle gradebook
+	Attention int      `json:"attention"` // submitted works with a similarity finding or a flag
+}
+
+// StudentSheet is the grade sheet of one student: every assignment of the course.
+type StudentSheet struct {
+	Student     Student `json:"student"`
+	Submissions []Row   `json:"submissions"`
 }
 
 func (s *Service) Sheet(ctx context.Context, userID, assignmentID int64) (Sheet, error) {
@@ -176,8 +207,40 @@ func (s *Service) Sheet(ctx context.Context, userID, assignmentID int64) (Sheet,
 		return Sheet{}, err
 	}
 
-	grader := fmt.Sprintf("%s/mod/assign/view.php?id=%d&action=grader", s.MoodleURL, head.CMID)
-	return Sheet{Assignment: head, Submissions: rows, MyGroups: mine, GraderURL: grader}, nil
+	s.linkGrader(rows)
+	return Sheet{Assignment: head, Submissions: rows, MyGroups: mine}, nil
+}
+
+func (s *Service) Students(ctx context.Context, courseID int64) ([]Student, error) {
+	return s.Store.Students(ctx, courseID)
+}
+
+// StudentSheet is every assignment of the course for one student, with the same rows as the sheet of an assignment.
+func (s *Service) StudentSheet(ctx context.Context, courseID, studentID int64) (StudentSheet, error) {
+	list, err := s.Store.Students(ctx, courseID)
+	if err != nil {
+		return StudentSheet{}, err
+	}
+
+	i := slices.IndexFunc(list, func(st Student) bool { return st.ID == studentID })
+	if i < 0 {
+		return StudentSheet{}, app.Fail(app.ErrNotFound, "no such student in this course")
+	}
+
+	rows, err := s.Store.StudentSubmissions(ctx, courseID, studentID)
+	if err != nil {
+		return StudentSheet{}, err
+	}
+
+	s.linkGrader(rows)
+	return StudentSheet{Student: list[i], Submissions: rows}, nil
+}
+
+// linkGrader gives each row the grading page of its student on its assignment in Moodle.
+func (s *Service) linkGrader(rows []Row) {
+	for i := range rows {
+		rows[i].GraderURL = fmt.Sprintf("%s/mod/assign/view.php?id=%d&action=grader&userid=%d", s.MoodleURL, rows[i].CMID, rows[i].MoodleUserID)
+	}
 }
 
 func (s *Service) History(ctx context.Context, submissionID int64) ([]Event, error) {

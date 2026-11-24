@@ -122,3 +122,29 @@ func (s *Store) StudentNames(ctx context.Context, courseID int64) ([]string, err
 
 	return pgx.CollectRows(rows, pgx.RowTo[string])
 }
+
+// Students lists the students of a course, the enrolled ones and those who left but submitted something, with a count of
+// their works. A work is the one the sheet shows: the newest attempt submitted, or the newest one.
+func (s *Store) Students(ctx context.Context, courseID int64) ([]grading.Student, error) {
+	rows, err := s.db.Query(ctx, `select st.id, st.full_name, moodle.short_name(st.last_name, st.first_name, st.full_name), st.groups, st.enrolled,
+		count(*) filter (where w.moodle_status = 'submitted'), count(mg.grade),
+		count(*) filter (where w.moodle_status = 'submitted' and (coalesce(d.integrity, 'ok') <> 'ok' or cardinality(coalesce(f.flags, '{}')) > 0))
+		from moodle.students st join moodle.assignments a on a.course_id = st.course_id
+		left join lateral (select x.id, x.moodle_status from moodle.submissions x where x.assignment_id = a.id and x.student_id = st.id
+			order by x.moodle_status = 'submitted' desc, x.attempt desc limit 1) w on true
+		left join integrity.submission_features f on f.submission_id = w.id
+		left join grading.grade_drafts d on d.submission_id = w.id
+		left join moodle.moodle_grades mg on mg.assignment_id = a.id and mg.moodle_user_id = st.moodle_user_id
+		where st.course_id = $1 and (st.enrolled or exists(select 1 from moodle.submissions x where x.student_id = st.id))
+		group by st.id order by 3, st.id`, courseID)
+	if err != nil {
+		return nil, wrap("list students", err)
+	}
+
+	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (grading.Student, error) {
+		var x grading.Student
+		err := r.Scan(&x.ID, &x.Name, &x.ShortName, &x.Groups, &x.Enrolled, &x.Submitted, &x.Graded, &x.Attention)
+		return x, err
+	})
+	return list, wrap("scan students", err)
+}

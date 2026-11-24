@@ -1,0 +1,32 @@
+# Checks a push to main and a pull request as a fresh clone: the linters, the tests (those that need a database skip
+# themselves without TEST_DATABASE_URL) and the images of docker compose, built and not published. Release runs it
+# before it makes a release.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: make lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: make test
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker compose -f deploy/docker-compose.yml build

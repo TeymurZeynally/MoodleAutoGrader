@@ -61,8 +61,10 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/courses/{id}/assignments", s.auth(s.assignments))
 	mux.Handle("GET /api/courses/{id}/settings", s.auth(s.courseSettings))
 	mux.Handle("PUT /api/courses/{id}/settings", s.auth(s.saveCourseSettings))
-	// The grade sheet (grades.go).
+	// The grade sheet, of an assignment or of a student (grades.go).
 	mux.Handle("GET /api/assignments/{id}/submissions", s.auth(s.submissions))
+	mux.Handle("GET /api/courses/{id}/students", s.auth(s.students))
+	mux.Handle("GET /api/courses/{id}/students/{student}", s.auth(s.studentSheet))
 	mux.Handle("PUT /api/submissions/{id}/draft", s.auth(s.updateDraft))
 	mux.Handle("GET /api/submissions/{id}/history", s.auth(s.history))
 	mux.Handle("POST /api/publish", s.auth(s.publish))

@@ -115,9 +115,18 @@ func (s *Service) ModelList(ctx context.Context) ([]string, error) {
 	return list, nil
 }
 
-// modelsProblem says, in words for the teacher, why the AI check of a course cannot run on its models with the given
-// ones (step -> model) over them; "" when it can.
+// modelsProblem says, in words for the teacher, why the AI check of a course cannot run: it is off in the course's
+// settings, or its models with the given ones (step -> model) over them are not chosen or not downloaded; "" when it can.
 func (s *Service) modelsProblem(ctx context.Context, courseID int64, models map[string]string) (string, error) {
+	settings, err := s.Store.CourseSettings(ctx, courseID)
+	if err != nil {
+		return "", err
+	}
+
+	if !settings.AICheck {
+		return `The AI check is off in this course: turn on "AI check" in the course settings.`, nil
+	}
+
 	over, err := s.Store.PromptOverrides(ctx, courseID)
 	if err != nil {
 		return "", err

@@ -11,6 +11,27 @@ func (s *Server) submissions(w http.ResponseWriter, r *http.Request, a authed) {
 	}
 }
 
+// students lists the students of a course, to find one.
+func (s *Server) students(w http.ResponseWriter, r *http.Request, a authed) {
+	if id, ok := s.course(w, r, a); ok {
+		list, err := s.Grading.Students(r.Context(), id)
+		s.respond(w, list, err)
+	}
+}
+
+// studentSheet is the grade sheet of one student: every assignment of the course.
+func (s *Server) studentSheet(w http.ResponseWriter, r *http.Request, a authed) {
+	id, ok := s.course(w, r, a)
+	if !ok {
+		return
+	}
+
+	if student, ok := pathID(w, r, "student"); ok {
+		sheet, err := s.Grading.StudentSheet(r.Context(), id, student)
+		s.respond(w, sheet, err)
+	}
+}
+
 func (s *Server) updateDraft(w http.ResponseWriter, r *http.Request, a authed) {
 	id, ok := s.submission(w, r, a)
 	if !ok {

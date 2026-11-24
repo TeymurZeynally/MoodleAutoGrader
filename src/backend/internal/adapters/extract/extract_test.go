@@ -3,6 +3,8 @@ package extract
 import (
 	"context"
 	"errors"
+	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -95,5 +97,36 @@ func TestAnArchiveIsLimitedByTheBytesReallyRead(t *testing.T) {
 	Add(context.Background(), &s, "lab.zip", zipOf(t, map[string]string{"A.cs": "12345678", "B.cs": "12345678"}), lim, DefaultProfile, noPDF)
 	if len(s.Code) != 1 || !strings.Contains(strings.Join(s.Flags, ","), work.FlagArchiveLimit) {
 		t.Fatalf("code %+v, flags %v", s.Code, s.Flags)
+	}
+}
+
+func TestAnArchiveIsReadByItsContentWhateverItsName(t *testing.T) {
+	data := zipOf(t, map[string]string{"Lab/Program.cs": "class Program {}"})
+	var s work.Snapshot
+	Add(t.Context(), &s, "lab.rar", data, DefaultLimits, DefaultProfile, noPDF)
+	if len(s.Code) != 1 || !slices.Contains(s.Flags, work.FlagTypeMismatch) || slices.Contains(s.Flags, work.FlagUnreadable) {
+		t.Fatalf("a zip named .rar is read as a zip and flagged: %+v", s)
+	}
+
+	if entries, err := List(t.Context(), "lab.rar", data, nil, DefaultProfile); err != nil || len(entries) != 1 {
+		t.Fatalf("the viewer too: %+v %v", entries, err)
+	}
+}
+
+func TestARARArchiveIsRead(t *testing.T) {
+	data, err := os.ReadFile("testdata/lab.rar") // RAR5: Lab/Program.cs, Lab/Services/GreeterService.cs, Lab/README.md
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var s work.Snapshot
+	Add(t.Context(), &s, "lab.rar", data, DefaultLimits, DefaultProfile, noPDF)
+	if len(s.Code) != 2 || len(s.Flags) != 0 {
+		t.Fatalf("%+v", s)
+	}
+
+	body, _, err := Open(t.Context(), "lab.rar", data, []string{"Lab/README.md"})
+	if err != nil || string(body) != "# Lab\n" {
+		t.Fatalf("%q %v", body, err)
 	}
 }

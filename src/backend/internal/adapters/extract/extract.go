@@ -93,7 +93,7 @@ func (p Profile) Skipped(name string) bool {
 func Add(ctx context.Context, s *work.Snapshot, name string, data []byte, lim Limits, prof Profile, pdf PDFText) {
 	kind := sniff(data)
 	ext := strings.ToLower(path.Ext(name))
-	if (ext == ".pdf" && kind != "pdf") || (ext == ".zip" && kind != "zip" && kind != "docx") {
+	if (ext == ".pdf" && kind != "pdf") || (ext == ".zip" && kind != "zip" && kind != "docx") || (ext == ".rar" && kind != "rar") || (ext == ".7z" && kind != "7z") {
 		s.Flag(work.FlagTypeMismatch)
 	}
 
@@ -182,9 +182,8 @@ func (r reading) archive(ctx context.Context, name string, data []byte) {
 
 // unpackAll gives send every file of an archive within the limits, outside the folders left out, and returns the flags.
 func unpackAll(ctx context.Context, j job, send func(unpacked) error) []string {
-	format, _, err := archives.Identify(ctx, j.Name, bytes.NewReader(j.Data))
-	ex, ok := format.(archives.Extractor)
-	if err != nil || !ok {
+	ex, ok := archiveOf(j.Data)
+	if !ok {
 		return []string{work.FlagUnreadable}
 	}
 
@@ -192,7 +191,7 @@ func unpackAll(ctx context.Context, j job, send func(unpacked) error) []string {
 	skip := NewProfile(nil, j.Skip)
 	var entries int
 	var total int64
-	err = ex.Extract(ctx, bytes.NewReader(j.Data), func(_ context.Context, f archives.FileInfo) error {
+	err := ex.Extract(ctx, bytes.NewReader(j.Data), func(_ context.Context, f archives.FileInfo) error {
 		if f.IsDir() {
 			return nil
 		}
@@ -233,6 +232,21 @@ func unpackAll(ctx context.Context, j job, send func(unpacked) error) []string {
 }
 
 var errLimit = errors.New("archive limit exceeded")
+
+// archiveOf picks the format of an archive by its content: the name a student gave it may lie, e.g. a zip saved as
+// ".rar", and a decoder handed the wrong format may never end.
+func archiveOf(data []byte) (archives.Extractor, bool) {
+	switch sniff(data) {
+	case "zip", "docx":
+		return archives.Zip{}, true
+	case "rar":
+		return archives.Rar{}, true
+	case "7z":
+		return archives.SevenZip{}, true
+	}
+
+	return nil, false
+}
 
 func sniff(b []byte) string {
 	switch {
@@ -279,9 +293,8 @@ func docxText(ctx context.Context, data []byte, s *work.Snapshot) string {
 // docxParts unpacks the two parts of a Word document that hold its text, in the child process; a macro project is
 // flagged, never run.
 func docxParts(ctx context.Context, data []byte) (document, styles []byte, flags []string) {
-	format, _, err := archives.Identify(ctx, "x.zip", bytes.NewReader(data))
-	ex, ok := format.(archives.Extractor)
-	if err != nil || !ok {
+	ex, ok := archiveOf(data)
+	if !ok {
 		return nil, nil, []string{work.FlagUnreadable}
 	}
 

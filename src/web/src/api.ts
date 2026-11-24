@@ -15,7 +15,9 @@ export interface Match { other_id: number; student: string; short_name: string; 
 // MoodleAttempt is one attempt of a student as Moodle has it; attempt counts from 0.
 export interface MoodleAttempt { attempt: number; status: string; submitted_at: string | null; files: string[]; grade: number | null; graded_at: string | null; comment: string; submission_id: number | null }
 
+// Submission is a row of a grade sheet: one student on one assignment, with or without a work.
 export interface Submission {
+  assignment_id: number; assignment: string; due_at: string | null; max_grade: number | null; moodle_grader_url: string; has_checklist: boolean
   id: number; student_id: number; moodle_user_id: number; student: string; short_name: string; enrolled: boolean; moodle_grade: number | null; graded_at: string | null; attempts: MoodleAttempt[]; groups: string[]; moodle_status: string; submitted_at: string | null; files: string[]; flags: string[]; integrity: 'ok' | 'medium' | 'high'
   points: number | null; comment: string; source: string; version: number; state: string; publish_error: string | null; matches: Match[] | null
   ai: AISummary | null; late: boolean; attempt: number; resubmitted: boolean; open_attempt: number | null; open_status: string
@@ -41,10 +43,13 @@ export interface Checklist {
 export interface CourseSettings {
   track_deadlines: boolean; late_penalty_enabled: boolean; late_penalty: number; late_notice: string
   require_code: boolean; extras_enabled: boolean
-  max_images: number; partial_credit: number; points_step: number
+  ai_check: boolean; max_images: number; partial_credit: number; points_step: number
   similar_percent: number; copy_percent: number; copy_identical_files: number; template_min_works: number; template_share: number
-  code_extensions: string[]; ignored_dirs: string[]
+  download_files: boolean; code_extensions: string[]; ignored_dirs: string[]
 }
+
+// Student is a student of a course with a count of their works; left the course when not enrolled.
+export interface Student { id: number; name: string; short_name: string; groups: string[]; enrolled: boolean; submitted: number; graded: number; attention: number }
 
 // Run is one AI check of a work; experiments tried other models and do not replace the current result.
 export interface Run { id: number; status: 'done' | 'needs_attention' | 'failed'; experiment: boolean; current: boolean; models: string; step_models: Record<string, string>; points: number | null; comment: string | null; error: string | null; started_at: string | null; finished_at: string; result: AIResult | null }
@@ -87,7 +92,9 @@ export const api = {
   connect: (id: number, on: boolean) => call<void>('POST', `/api/courses/${id}/${on ? 'connect' : 'disconnect'}`),
   sync: (id: number) => call<void>('POST', `/api/courses/${id}/sync`),
   assignments: (courseId: number) => call<Assignment[]>('GET', `/api/courses/${courseId}/assignments`),
-  submissions: (assignmentId: number) => call<{ assignment: AssignmentHeader; submissions: Submission[]; my_groups: string[]; moodle_grader_url: string }>('GET', `/api/assignments/${assignmentId}/submissions`),
+  submissions: (assignmentId: number) => call<{ assignment: AssignmentHeader; submissions: Submission[]; my_groups: string[] }>('GET', `/api/assignments/${assignmentId}/submissions`),
+  students: (courseId: number) => call<Student[] | null>('GET', `/api/courses/${courseId}/students`),
+  studentSheet: (courseId: number, studentId: number) => call<{ student: Student; submissions: Submission[] | null }>('GET', `/api/courses/${courseId}/students/${studentId}`),
   saveDraft: (id: number, points: number | null, comment: string, version: number) => call<void>('PUT', `/api/submissions/${id}/draft`, { points, comment, version }),
   compare: (id: number, other: number) => call<{ a: string; b: string; method: 'dolos' | 'fingerprints'; diff: Diff }>('GET', `/api/submissions/${id}/compare/${other}`),
   files: (id: number) => call<UploadedFile[]>('GET', `/api/submissions/${id}/files`),

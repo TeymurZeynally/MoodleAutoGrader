@@ -6,15 +6,16 @@ import { Login } from './pages/Login'
 import { CoursesPage } from './pages/Courses'
 import { CoursePage } from './pages/Course'
 import { AssignmentPage } from './pages/Assignment'
+import { StudentPage } from './pages/Student'
 import { AIStatusBadge } from './pages/AIStatus'
 
-// Minimal hash router: #/courses, #/course/:id, #/assignment/:id
+// Minimal hash router: #/courses, #/course/:id[/students|/settings|/prompts], #/course/:id/student/:id, #/assignment/:id
 function useRoute() {
   const [hash, setHash] = useState(location.hash || '#/courses')
   useEffect(() => { const on = () => setHash(location.hash || '#/courses'); addEventListener('hashchange', on); return () => removeEventListener('hashchange', on) }, [])
 
-  const [, page, id] = hash.split('/')
-  return { page, id: Number(id) }
+  const [, page, id, view, sub] = hash.split('/')
+  return { page, id: Number(id), view, sub: sub ? Number(sub) : null }
 }
 
 // usePoll re-runs fn every ms while active.
@@ -50,7 +51,8 @@ export function App() {
         <Button icon={<LogoutOutlined />} onClick={logout}>Sign out</Button>
       </Layout.Header>
       <Layout.Content style={{ padding: 24 }}>
-        {route.page === 'course' ? <CoursePage id={route.id} /> : route.page === 'assignment' ? <AssignmentPage id={route.id} /> : <CoursesPage />}
+        {route.page === 'course' && route.view === 'student' && route.sub !== null ? <StudentPage courseId={route.id} studentId={route.sub} />
+        : route.page === 'course' ? <CoursePage id={route.id} view={route.view} /> : route.page === 'assignment' ? <AssignmentPage id={route.id} /> : <CoursesPage />}
       </Layout.Content>
     </Layout>
   )

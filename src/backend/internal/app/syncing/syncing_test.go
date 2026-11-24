@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"moodle-autograder/internal/app"
+	"moodle-autograder/internal/domain/course"
 	"moodle-autograder/internal/domain/work"
 )
 
@@ -93,7 +94,14 @@ func (fetchMoodle) Submissions(context.Context, string, int64) ([]Submission, er
 
 type fetchStore struct {
 	Store
-	order *[]string
+	order   *[]string
+	noFiles bool
+}
+
+func (f fetchStore) CourseSettings(context.Context, int64) (course.Settings, error) {
+	c := course.Defaults()
+	c.DownloadFiles = !f.noFiles
+	return c, nil
 }
 
 func (f fetchStore) CourseMoodleID(context.Context, int64) (int64, error) { return 77, nil }
@@ -352,6 +360,19 @@ func TestFetchLoadsPreparedDataOnceTheAssignmentsAreStored(t *testing.T) {
 	s.Seeds = fakeSeeds{order: order, err: boom}
 	if _, err := s.Fetch(context.Background(), "token", 1, 5); !errors.Is(err, boom) {
 		t.Fatalf("the sync retries a failed step: %v", err)
+	}
+}
+
+func TestACourseWithoutFilesKeepsItsGradesAndPlansNoFile(t *testing.T) {
+	order := &[]string{}
+	s := &Service{Store: fetchStore{order: order, noFiles: true}, Moodle: fetchMoodle{}, Seeds: fakeSeeds{order: order}}
+	plan, err := s.Fetch(context.Background(), "token", 1, 5)
+	if err != nil || plan.Assignments != nil || plan.Download != nil || plan.Process != nil {
+		t.Fatalf("nothing is downloaded, read or checked: %+v %v", plan, err)
+	}
+
+	if len(*order) != 2 || (*order)[0] != "assignment" {
+		t.Fatalf("the assignment and its grades are still copied: %v", *order)
 	}
 }
 

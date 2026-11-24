@@ -142,8 +142,14 @@ func TestEveryQueryRuns(t *testing.T) {
 	must("SaveCourseSettings", s.SaveCourseSettings(ctx, courseID, user, c))
 	got, err := s.CourseSettings(ctx, courseID)
 	must("CourseSettings", err)
-	if len(got.CodeExtensions) != 1 || got.MaxImages != 16 || got.LateNotice != c.LateNotice {
+	if len(got.CodeExtensions) != 1 || got.MaxImages != 16 || got.LateNotice != c.LateNotice || !got.DownloadFiles {
 		t.Fatalf("settings round trip: %+v", got)
+	}
+
+	c.DownloadFiles, c.AICheck = false, false
+	must("SaveCourseSettings", s.SaveCourseSettings(ctx, courseID, user, c))
+	if got, err := s.CourseSettings(ctx, courseID); err != nil || got.DownloadFiles || got.AICheck {
+		t.Fatalf("a course without files and AI check: %+v %v", got, err)
 	}
 
 	must("SetPrompt", s.SetPrompt(ctx, courseID, "check.user", "{{.Work}} {{.Checklist}}", user))
@@ -199,8 +205,20 @@ func TestEveryQueryRuns(t *testing.T) {
 	must("ApplyAIDraft", s.ApplyAIDraft(ctx, sub, res, "ok"))
 	rows, err := s.Submissions(ctx, assignID)
 	must("Submissions", err)
-	if len(rows) != 1 || rows[0].ShortName != "Иванов И. И." { //nolint:dupword // the initials of Ivan Ivanovich
+	if len(rows) != 1 || rows[0].ShortName != "Иванов И. И." || rows[0].Assignment != "Lab" || rows[0].CMID != 6 { //nolint:dupword // the initials of Ivan Ivanovich
 		t.Fatalf("sheet: %+v", rows)
+	}
+
+	mine, err := s.StudentSubmissions(ctx, courseID, student)
+	must("StudentSubmissions", err)
+	if len(mine) != 1 || mine[0].ID != sub || mine[0].AssignmentID != assignID {
+		t.Fatalf("the sheet of a student: %+v", mine)
+	}
+
+	students, err := s.Students(ctx, courseID)
+	must("Students", err)
+	if len(students) != 1 || students[0].ID != student || students[0].ShortName != "Иванов И. И." || students[0].Submitted != 1 { //nolint:dupword // the initials of Ivan Ivanovich
+		t.Fatalf("students: %+v", students)
 	}
 
 	if err := s.UpdateDraft(ctx, sub, user, &five, "c", 999); !errors.Is(err, app.ErrConflict) {

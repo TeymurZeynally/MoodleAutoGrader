@@ -3,10 +3,12 @@ import { App, Breadcrumb, Button, Card, Flex, Form, Input, InputNumber, Progress
 import { EyeOutlined, SyncOutlined } from '@ant-design/icons'
 import { AIProgress, api, Assignment, Course, CourseSettings, errText, fmtDate } from '../api'
 import { PromptsPage } from './Prompts'
+import { StudentsTab } from './Student'
 import { usePoll } from '../App'
 import { useAIStatus } from './AIStatus'
 
-export function CoursePage({ id }: { id: number }) {
+// CoursePage lists the assignments and the students of a course, and holds its settings; the tab is in the address.
+export function CoursePage({ id, view }: { id: number; view?: string }) {
   const { message } = App.useApp()
   const [list, setList] = useState<Assignment[] | null>(null), [course, setCourse] = useState<Course | null>(null)
   const load = useCallback(() => { api.assignments(id).then(setList, e => message.error(errText(e))) }, [id, message])
@@ -15,6 +17,7 @@ export function CoursePage({ id }: { id: number }) {
     api.courses().then(cs => setCourse(cs.find(c => c.id === id) ?? null), () => {})
   }, [id, load])
 
+  const tab = view === 'students' || view === 'settings' || view === 'prompts' ? view : 'assignments'
   const ai = useAIStatus(5000)
   usePoll(load, (list ?? []).some(a => a.ai.queued + a.ai.running > 0) || !!ai?.activity, 5000)
 
@@ -37,8 +40,9 @@ export function CoursePage({ id }: { id: number }) {
     <>
       <Breadcrumb style={{ marginBottom: 16 }} items={[{ title: <a href="#/courses">Courses</a> }, { title: course?.name ?? '…' }]} />
       <Card title={<Typography.Title level={4} style={{ margin: 0 }}>{course?.name ?? 'Assignments'}</Typography.Title>}>
-        <Tabs items={[
+        <Tabs activeKey={tab} onChange={k => { location.hash = k === 'assignments' ? `#/course/${id}` : `#/course/${id}/${k}` }} items={[
           { key: 'assignments', label: 'Assignments', children: <Table rowKey="id" loading={list === null} dataSource={list ?? []} columns={columns} pagination={false} /> },
+          { key: 'students', label: 'Students', children: <StudentsTab courseId={id} /> },
           { key: 'settings', label: 'Settings', children: <SettingsTab courseId={id} /> },
           { key: 'prompts', label: 'AI prompts', children: <PromptsPage courseId={id} /> },
         ]} />
@@ -89,6 +93,11 @@ function SettingsTab({ courseId }: { courseId: number }) {
   const late = s.track_deadlines && s.late_penalty_enabled
   return (
     <Form layout="vertical" style={{ maxWidth: 720 }}>
+      <Typography.Title level={5}>Grades</Typography.Title>
+      <Form.Item label="Points step" extra="The step of the grade field; checklists the AI builds round their points to it.">
+        <InputNumber id="points-step" min={0.01} max={10} step={0.25} value={s.points_step} onChange={v => set({ points_step: num(v, 0.5) })} />
+      </Form.Item>
+
       <Typography.Title level={5}>Deadlines</Typography.Title>
       <Form.Item label="Track deadlines" extra="Show how late each work was uploaded after the deadline set in Moodle. Moodle extensions for single students are not taken into account.">
         <Switch id="track-deadlines" checked={s.track_deadlines} onChange={v => set({ track_deadlines: v })} />
@@ -112,15 +121,15 @@ function SettingsTab({ courseId }: { courseId: number }) {
       </Form.Item>
 
       <Typography.Title level={5}>AI check</Typography.Title>
+      <Form.Item label="AI check" extra="When off, the works of this course are not analyzed and no checklist is built; the similarity check, the file viewer and grading work as before.">
+        <Switch id="ai-check" checked={s.ai_check} onChange={v => set({ ai_check: v })} />
+      </Form.Item>
       <Flex gap={24} wrap>
         <Form.Item label="Pictures per work" extra="PDF pages with images and screenshots the model reads; the slowest step of the check.">
-          <InputNumber id="max-images" min={0} max={100} value={s.max_images} onChange={v => set({ max_images: num(v, 16) })} />
+          <InputNumber id="max-images" min={0} max={100} value={s.max_images} disabled={!s.ai_check} onChange={v => set({ max_images: num(v, 16) })} />
         </Form.Item>
         <Form.Item label="“Partial” gives" extra="Share of a criterion’s points for a partly done criterion.">
-          <InputNumber id="partial-credit" min={0} max={100} step={5} value={Math.round(s.partial_credit * 100)} onChange={v => set({ partial_credit: num(v, 50) / 100 })} addonAfter="%" />
-        </Form.Item>
-        <Form.Item label="Points step" extra="Generated checklists round points to this step; also the step of the grade field.">
-          <InputNumber id="points-step" min={0.01} max={10} step={0.25} value={s.points_step} onChange={v => set({ points_step: num(v, 0.5) })} />
+          <InputNumber id="partial-credit" min={0} max={100} step={5} value={Math.round(s.partial_credit * 100)} disabled={!s.ai_check} onChange={v => set({ partial_credit: num(v, 50) / 100 })} addonAfter="%" />
         </Form.Item>
       </Flex>
 
@@ -146,6 +155,9 @@ function SettingsTab({ courseId }: { courseId: number }) {
       </Flex>
 
       <Typography.Title level={5}>Files</Typography.Title>
+      <Form.Item label="Download files" extra="When off, a sync copies only the grades, comments and attempts from Moodle, to look at and correct grades: no file is downloaded, so the file viewer, the similarity check and the AI check are off in this course. Turn it on again and sync to download the files.">
+        <Switch id="download-files" checked={s.download_files} onChange={v => set({ download_files: v })} />
+      </Form.Item>
       <Form.Item label="Source code files" extra="Extensions read as code: compared by the similarity check and shown to the model. Other text files are compared as plain text.">
         <Select id="code-extensions" mode="tags" value={s.code_extensions} onChange={v => set({ code_extensions: v })} tokenSeparators={[',', ' ']} />
       </Form.Item>
