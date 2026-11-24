@@ -78,6 +78,10 @@ Other models and their settings: [Models](#models).
 <td width="50%"><img src="assets/screenshots/injection.png" width="100%" alt="A caught prompt injection"><br><b>A work that asks the grader for full marks.</b> Found, quoted, not graded and left for the teacher.</td>
 </tr>
 <tr>
+<td><img src="assets/screenshots/students.png" width="100%" alt="The students of a course"><br><b>The students of a course.</b> How many works each one submitted, how many are graded in Moodle and how many need attention.</td>
+<td><img src="assets/screenshots/student.png" width="100%" alt="The page of a student"><br><b>The page of a student.</b> Every assignment of the student in one sheet, with the edits and publishing of the sheet of an assignment.</td>
+</tr>
+<tr>
 <td><img src="assets/screenshots/compare.png" width="100%" alt="Two works side by side"><br><b>Two works side by side.</b> Matching code and report lines are highlighted, starter code is grey.</td>
 <td><img src="assets/screenshots/files.png" width="100%" alt="The file viewer"><br><b>The file viewer.</b> An archive as a tree, code with line numbers, PDF pages, nested archives.</td>
 </tr>
