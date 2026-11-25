@@ -78,7 +78,7 @@ func TestReadsAnExistingDatabase(t *testing.T) {
 		check("LatestChecklist", err)
 		_, err = s.AssignmentFeatures(ctx, a)
 		check("AssignmentFeatures", err)
-		_, err = s.SubmittedIDs(ctx, a, true)
+		_, err = s.SubmittedIDs(ctx, a, true, []string{"G"})
 		check("SubmittedIDs", err)
 		_, err = s.FailedIDs(ctx, a)
 		check("FailedIDs", err)

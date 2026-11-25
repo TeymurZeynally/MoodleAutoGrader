@@ -66,10 +66,10 @@ export function StudentPage({ courseId, studentId }: { courseId: number; student
   const count = (f: (s: Submission) => boolean) => list.filter(f).length
   const publishable = selected.filter(id => list.some(s => s.id === id && ready(s)))
   const filesOff = settings?.download_files === false
-  const toAnalyze = list.filter(s => submitted(s) && (selected.length === 0 || selected.includes(s.id)))
+  const toAnalyze = list.filter(s => submitted(s) && s.ai_check && (selected.length === 0 || selected.includes(s.id)))
 
-  // reanalyze checks the chosen works again, or every submitted one, assignment by assignment; a work of an assignment
-  // without a checklist is left out: the check would build one the teacher has not seen.
+  // reanalyze checks the chosen works again, or every submitted one, assignment by assignment; works of assignments with
+  // the AI check off are left out, and so are those without a checklist: the check would build one the teacher has not seen.
   const reanalyze = async () => {
     const byAssignment = new Map<number, Submission[]>()
     for (const s of toAnalyze.filter(s => s.has_checklist)) byAssignment.set(s.assignment_id, [...(byAssignment.get(s.assignment_id) ?? []), s])
@@ -126,7 +126,7 @@ export function StudentPage({ courseId, studentId }: { courseId: number; student
         <Flex gap={12} wrap align="center" justify="end" style={{ marginBottom: 16 }}>
           <Space>
             <Tooltip title="Drafts nothing asks you to look at: no strong similarity, no flags, an AI check without remarks; and drafts you saved yourself. Others can be ticked one by one."><Button icon={<CheckOutlined />} onClick={() => setSelected(list.filter(s => ready(s) && unremarkable(s) && !dirty(s)).map(s => s.id))}>Select ready</Button></Tooltip>
-            {!filesOff && settings?.ai_check !== false && <Popconfirm title={`Analyze ${toAnalyze.length} work(s) again with the AI check?`} description="Works of assignments without a checklist are left out." onConfirm={reanalyze} disabled={!toAnalyze.length}>
+            {!filesOff && settings?.ai_check !== false && <Popconfirm title={`Analyze ${toAnalyze.length} work(s) again with the AI check?`} description="Works of assignments without a checklist or with the AI check off are left out." onConfirm={reanalyze} disabled={!toAnalyze.length}>
               <Button icon={<SyncOutlined />} disabled={!toAnalyze.length} loading={busy}>{selected.length ? `Re-analyze selected (${toAnalyze.length})` : `Re-analyze all (${toAnalyze.length})`}</Button>
             </Popconfirm>}
             <Popconfirm title={`Publish ${publishable.length} grade(s) to Moodle?`} onConfirm={() => publish(publishable)} disabled={!publishable.length}>

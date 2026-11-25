@@ -210,7 +210,7 @@ func safePath(f archives.FileInfo) (string, bool) {
 
 var (
 	kindOfExt = map[string]string{
-		".pdf": "pdf", ".docx": "docx", ".png": "image", ".jpg": "image", ".jpeg": "image", ".gif": "image", ".webp": "image", ".bmp": "image",
+		".pdf": "pdf", ".docx": "docx", ".doc": "docx", ".png": "image", ".jpg": "image", ".jpeg": "image", ".gif": "image", ".webp": "image", ".bmp": "image",
 		".zip": "archive", ".rar": "archive", ".7z": "archive", ".exe": "exe", ".dll": "exe", ".so": "exe",
 	}
 	textExt = map[string]bool{".txt": true, ".md": true, ".json": true, ".xml": true, ".yml": true, ".yaml": true, ".config": true, ".sln": true, ".gitignore": true, ".env": true, ".http": true, ".csv": true, ".html": true, ".css": true, ".svg": true, ".dockerfile": true}
@@ -246,6 +246,8 @@ func Detect(name string, data []byte) (string, string) {
 	}
 
 	switch {
+	case bytes.HasPrefix(data, []byte("\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")) && strings.EqualFold(path.Ext(name), ".doc"):
+		return "docx", "application/octet-stream" // a Word document of the older binary format
 	case bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n")):
 		return "image", "image/png"
 	case bytes.HasPrefix(data, []byte("\xff\xd8\xff")):

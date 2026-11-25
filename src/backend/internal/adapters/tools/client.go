@@ -53,9 +53,15 @@ type Page struct {
 	PNG  []byte `json:"png"`
 }
 
-// PDFImagePages renders the pages of a PDF that contain images (screenshots), at most limit, longest side size px.
-func (c *Client) PDFImagePages(ctx context.Context, pdf []byte, limit, size int) ([]Page, int, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/pdf/pages?max=%d&size=%d", c.url, limit, size), bytes.NewReader(pdf))
+// PDFPages renders the pages of a PDF that contain images (screenshots), or with all every page, at most limit,
+// longest side size px.
+func (c *Client) PDFPages(ctx context.Context, pdf []byte, limit, size int, all bool) ([]Page, int, error) {
+	every := ""
+	if all {
+		every = "&all=1"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/pdf/pages?max=%d&size=%d%s", c.url, limit, size, every), bytes.NewReader(pdf))
 	if err != nil {
 		return nil, 0, fmt.Errorf("tools request: %w", err)
 	}

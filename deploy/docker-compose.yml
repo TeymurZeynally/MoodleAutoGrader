@@ -221,6 +221,7 @@ services:
   # but its own, no secrets, read-only, nobody.
   tools:
     build: { context: .., dockerfile: deploy/app.Dockerfile, target: tools }
+    init: true  # LibreOffice leaves helper processes (gpg) behind: an init reaps them, or they fill the process limit
     networks: [tools]
     read_only: true
     tmpfs: [/tmp]

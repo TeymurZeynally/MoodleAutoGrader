@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { App, Breadcrumb, Button, Card, Flex, Form, Input, InputNumber, Progress, Select, Switch, Table, Tabs, Tag, Tooltip, Typography } from 'antd'
-import { EyeOutlined, SyncOutlined } from '@ant-design/icons'
+import { App, Breadcrumb, Button, Card, Dropdown, Flex, Form, Input, InputNumber, Progress, Select, Switch, Table, Tabs, Tag, Tooltip, Typography } from 'antd'
+import { DownOutlined, EyeOutlined, SyncOutlined } from '@ant-design/icons'
 import { AIProgress, api, Assignment, Course, CourseSettings, errText, fmtDate } from '../api'
 import { PromptsPage } from './Prompts'
 import { StudentsTab } from './Student'
@@ -21,6 +21,16 @@ export function CoursePage({ id, view }: { id: number; view?: string }) {
   const ai = useAIStatus(5000)
   usePoll(load, (list ?? []).some(a => a.ai.queued + a.ai.running > 0) || !!ai?.activity, 5000)
 
+  // turnAI switches the AI check of the given assignments; a course with many assignments turns them all off and the few
+  // it grades on.
+  const turnAI = async (on: boolean, which: Assignment[]) => {
+    try {
+      for (const a of which.filter(a => a.ai_check !== on)) await api.setAICheck(a.id, on)
+    } catch (e) { message.error(errText(e)) }
+
+    load()
+  }
+
   const columns = [
     {
       title: 'Assignment', dataIndex: 'name', render: (_: string, a: Assignment) => <>
@@ -32,7 +42,19 @@ export function CoursePage({ id, view }: { id: number; view?: string }) {
     { title: 'Max', dataIndex: 'max_grade', width: 80, render: (m: number | null) => m ?? 'scale' },
     { title: 'Submitted', dataIndex: 'submitted', width: 110 },
     { title: 'Need attention', dataIndex: 'flagged', width: 140, render: (n: number) => n ? <Tag color="red">{n}</Tag> : <Tag color="green">0</Tag> },
-    { title: 'AI check', width: 260, render: (_: unknown, a: Assignment) => <AIColumn ai={a.ai} building={ai?.activity?.kind === 'checklist' && ai.activity.assignment_id === a.id} /> },
+    {
+      title: <Flex gap={4} align="center">AI check
+        <Dropdown menu={{ items: [{ key: 'on', label: 'Turn on for every assignment' }, { key: 'off', label: 'Turn off for every assignment' }], onClick: ({ key }) => { void turnAI(key === 'on', list ?? []) } }}>
+          <Button size="small" type="text" icon={<DownOutlined />} aria-label="AI check of every assignment" />
+        </Dropdown>
+      </Flex>,
+      width: 300, render: (_: unknown, a: Assignment) => <Flex gap={10} align="start">
+        <Tooltip title={a.ai_check ? 'Turn the AI check of this assignment off: no checklist is built and no work is analyzed' : 'Turn the AI check of this assignment on'}>
+          <Switch size="small" checked={a.ai_check} onChange={v => turnAI(v, [a])} style={{ marginTop: 3 }} />
+        </Tooltip>
+        {a.ai_check ? <AIColumn ai={a.ai} building={ai?.activity?.kind === 'checklist' && ai.activity.assignment_id === a.id} /> : <Typography.Text type="secondary">off</Typography.Text>}
+      </Flex>,
+    },
     { title: 'Published', width: 200, render: (_: unknown, a: Assignment) => <Progress size="small" percent={a.submitted ? Math.round((100 * a.published) / a.submitted) : 0} format={() => `${a.published}/${a.submitted}`} /> },
   ]
 
@@ -76,8 +98,9 @@ function AIColumn({ ai, building }: { ai: AIProgress; building: boolean }) {
 // SettingsTab holds the rules of the course: everything that may differ between courses lives here, not in code.
 function SettingsTab({ courseId }: { courseId: number }) {
   const { message } = App.useApp()
-  const [s, setS] = useState<CourseSettings | null>(null), [busy, setBusy] = useState(false)
+  const [s, setS] = useState<CourseSettings | null>(null), [busy, setBusy] = useState(false), [groups, setGroups] = useState<string[]>([])
   useEffect(() => { api.courseSettings(courseId).then(setS, e => message.error(errText(e))) }, [courseId, message])
+  useEffect(() => { api.students(courseId).then(list => setGroups([...new Set((list ?? []).flatMap(st => st.groups))].sort()), () => {}) }, [courseId])
 
   if (!s) return null
   const set = (patch: Partial<CourseSettings>) => setS({ ...s, ...patch })
@@ -124,9 +147,15 @@ function SettingsTab({ courseId }: { courseId: number }) {
       <Form.Item label="AI check" extra="When off, the works of this course are not analyzed and no checklist is built; the similarity check, the file viewer and grading work as before.">
         <Switch id="ai-check" checked={s.ai_check} onChange={v => set({ ai_check: v })} />
       </Form.Item>
+      <Form.Item label="Groups" extra="Works of these groups are analyzed after a sync and on “Re-analyze all”; none chosen: every group. A work you choose yourself is analyzed whatever its group. Single assignments are turned off in the “AI check” column of the Assignments tab.">
+        <Select id="ai-groups" mode="multiple" allowClear placeholder="All groups" value={s.ai_groups} disabled={!s.ai_check} onChange={v => set({ ai_groups: v })} options={groups.map(g => ({ value: g, label: g }))} />
+      </Form.Item>
       <Flex gap={24} wrap>
         <Form.Item label="Pictures per work" extra="PDF pages with images and screenshots the model reads; the slowest step of the check.">
           <InputNumber id="max-images" min={0} max={100} value={s.max_images} disabled={!s.ai_check} onChange={v => set({ max_images: num(v, 16) })} />
+        </Form.Item>
+        <Form.Item label="Read every page" extra="The model reads every page of a PDF or Word report as a picture, not only the pages with images: diagrams drawn with lines and shapes are seen too. Each page counts as a picture and adds a few seconds.">
+          <Switch id="read-all-pages" checked={s.read_all_pages} disabled={!s.ai_check} onChange={v => set({ read_all_pages: v })} />
         </Form.Item>
         <Form.Item label="“Partial” gives" extra="Share of a criterion’s points for a partly done criterion.">
           <InputNumber id="partial-credit" min={0} max={100} step={5} value={Math.round(s.partial_credit * 100)} disabled={!s.ai_check} onChange={v => set({ partial_credit: num(v, 50) / 100 })} addonAfter="%" />

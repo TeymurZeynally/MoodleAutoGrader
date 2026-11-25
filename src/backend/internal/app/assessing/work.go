@@ -136,7 +136,7 @@ func (s *Service) loadWork(ctx context.Context, in WorkRequest) (workInput, erro
 // readPages asks the model what is on the screenshots, as text for the next steps (the slowest part on the GPU). A page
 // it cannot read is noted for the teacher; only a broken prompt stops the check.
 func (s *Service) readPages(ctx context.Context, w workInput, res *assessment.Result, step func(string)) error {
-	imgs := s.Uploads.Images(ctx, w.files, w.settings.MaxImages)
+	imgs := s.Uploads.Images(ctx, w.files, w.settings.MaxImages, w.settings.ReadAllPages)
 	for i, img := range imgs {
 		if img.Err != "" {
 			res.Attention = append(res.Attention, "could not read "+img.Source+": "+img.Err)

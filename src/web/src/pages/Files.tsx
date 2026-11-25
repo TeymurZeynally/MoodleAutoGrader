@@ -122,7 +122,7 @@ function Viewer({ id, node }: { id: number; node: Node }) {
     case 'image': return <>{header}<div className="code-view" style={{ maxHeight: '75vh', padding: 8, textAlign: 'center' }}><img src={url} alt={node.name} style={{ maxWidth: '100%' }} /></div></>
     case 'archive': return <>{header}<Empty description="An archive: expand it in the tree on the left" /></>
     case 'exe': return <>{header}<Alert type="error" showIcon title="Executable file: not shown" description="Download it only if you know what you are doing; do not run it." /></>
-    case 'docx': return <>{header}<TextView url={rawUrl(id, node.file, node.inner, 'text')} /></>
+    case 'docx': return <>{header}<Suspense fallback={<Spin />}><PdfView url={rawUrl(id, node.file, node.inner, 'pdf')} fallback={<TextView url={rawUrl(id, node.file, node.inner, 'text')} />} /></Suspense></>
     default: return <>{header}<TextView url={url} /></>
   }
 }

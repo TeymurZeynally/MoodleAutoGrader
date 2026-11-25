@@ -22,9 +22,11 @@ COPY --from=build /out/autograder /autograder
 ENTRYPOINT ["/autograder"]
 CMD ["web"]
 
-# Document utilities: poppler only. Runs without network, as nobody, read-only (compose).
+# Document utilities: poppler, and LibreOffice Writer to lay out Word documents as PDFs, with fonts that match the
+# metrics of Word's own (Calibri, Cambria, Times New Roman, Arial). Runs without network, as nobody, read-only (compose).
 FROM debian:stable-slim AS tools
-RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils libreoffice-writer-nogui \
+    fonts-liberation fonts-crosextra-carlito fonts-crosextra-caladea fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/toolsd /toolsd
 USER 65534:65534
 ENTRYPOINT ["/toolsd"]

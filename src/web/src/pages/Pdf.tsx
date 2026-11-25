@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { ReactNode, useEffect, useRef, useState } from 'react'
 import { Alert, Flex, Spin, Typography } from 'antd'
 // The legacy build polyfills recent JavaScript features, so older browsers render PDFs too.
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs'
@@ -8,8 +8,8 @@ import { errText, fetchRaw } from '../api'
 GlobalWorkerOptions.workerSrc = workerUrl
 
 // PdfView renders every page to a canvas with pdf.js, so screenshots in reports are visible. The page CSP forbids
-// eval, and PDF scripts, forms and links are not run.
-export default function PdfView({ url }: { url: string }) {
+// eval, and PDF scripts, forms and links are not run. When the pages cannot be had, fallback is shown instead, if any.
+export default function PdfView({ url, fallback }: { url: string; fallback?: ReactNode }) {
   const box = useRef<HTMLDivElement>(null), [error, setError] = useState(''), [pages, setPages] = useState<number | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -42,6 +42,7 @@ export default function PdfView({ url }: { url: string }) {
     return () => { cancelled = true }
   }, [url])
 
+  if (error && fallback) return <><Alert type="info" showIcon style={{ marginBottom: 8 }} title="The document could not be shown as pages; its text is shown instead" description={error} />{fallback}</>
   return (
     <>
       {error && <Alert type="error" showIcon title={`Cannot render the PDF: ${error}`} />}

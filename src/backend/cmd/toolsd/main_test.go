@@ -137,3 +137,22 @@ func TestDocxTextOfABrokenFileIsEmpty(t *testing.T) {
 		t.Fatalf("%d %s %v", rec.Code, rec.Body, err)
 	}
 }
+
+// Only a Word document is laid out: LibreOffice would turn any bytes into pages of text.
+func TestOnlyAWordDocumentIsLaidOut(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /doc/pdf", docPDF)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c := tools.New(srv.URL)
+	for name, data := range map[string][]byte{
+		"random bytes":     []byte("\x00\x01 not a document at all"),
+		"a zip, not Word":  zipOf(t, map[string]string{"notes.txt": "text"}),
+		"a PDF":            []byte("%PDF-1.4\n"),
+		"an empty request": nil,
+	} {
+		if pdf, err := c.DocPDF(t.Context(), data); err == nil || !strings.Contains(err.Error(), "not a Word document") {
+			t.Fatalf("%s: %d bytes, %v", name, len(pdf), err)
+		}
+	}
+}

@@ -92,6 +92,17 @@ func (a Archives) Open(ctx context.Context, name string, data []byte, inner []st
 	return raw, opened, nil
 }
 
+// DocPDF returns a Word document (DOCX or DOC) laid out as a PDF.
+func (c *Client) DocPDF(ctx context.Context, data []byte) ([]byte, error) {
+	pdf, _, err := c.post(ctx, "/doc/pdf", nil, data)
+	return pdf, err
+}
+
+// DocPDF returns a Word document laid out as a PDF, for the viewer.
+func (a Archives) DocPDF(ctx context.Context, data []byte) ([]byte, error) {
+	return a.Client.DocPDF(ctx, data)
+}
+
 // DocxText returns the text of a Word document; empty when it cannot be read.
 func (a Archives) DocxText(ctx context.Context, data []byte) string {
 	raw, _, err := a.Client.post(ctx, "/docx/text", nil, data)

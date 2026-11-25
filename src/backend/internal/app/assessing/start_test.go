@@ -26,15 +26,18 @@ type startStore struct {
 	intro       string
 	noFiles     bool
 	noAI        bool
+	offHere     bool // the AI check is off for the assignment
 	checklist   bool
 }
 
 func (f *startStore) ClearActivity(context.Context) error { return nil }
 
 func (f *startStore) FailedIDs(context.Context, int64) ([]int64, error) { return f.failed, nil }
-func (f *startStore) SubmittedIDs(context.Context, int64, bool) ([]int64, error) {
+func (f *startStore) SubmittedIDs(context.Context, int64, bool, []string) ([]int64, error) {
 	return f.submitted, nil
 }
+
+func (f *startStore) AssignmentAICheck(context.Context, int64) (bool, error) { return !f.offHere, nil }
 
 func (f *startStore) ApproveChecklist(context.Context, int64, int64) error {
 	f.approved++
@@ -176,27 +179,33 @@ func TestASyncWithoutModelsQueuesNothingAndBuildsNothing(t *testing.T) {
 	}
 }
 
-func TestACourseWithTheAICheckOffBuildsNothingAndChecksNothing(t *testing.T) {
-	s, st, r := startService()
-	s.Assessors = func(_, _ map[string]string) Assessor { return fakeAssessor{} }
-	st.noAI, st.checklist, st.submitted = true, true, []int64{3}
-	st.maxGrade, st.intro = new(5.0), "Do the lab"
-	ctx := context.Background()
-	if ids, err := s.QueueWorks(ctx, Job{AssignmentID: 2, FromSync: true}); err != nil || ids != nil {
-		t.Fatalf("a sync queues nothing: %v %v", ids, err)
-	}
+func TestTheAICheckOffInACourseOrForAnAssignmentBuildsNothingAndChecksNothing(t *testing.T) {
+	for _, where := range []string{"course", "assignment"} {
+		s, st, r := startService()
+		s.Assessors = func(_, _ map[string]string) Assessor { return fakeAssessor{} }
+		st.noAI, st.offHere, st.checklist, st.submitted = where == "course", where == "assignment", true, []int64{3}
+		st.maxGrade, st.intro = new(5.0), "Do the lab"
+		ctx := context.Background()
+		if ids, err := s.QueueWorks(ctx, Job{AssignmentID: 2, FromSync: true}); err != nil || ids != nil {
+			t.Fatalf("%s: a sync queues nothing: %v %v", where, ids, err)
+		}
 
-	if _, err := s.Rerun(ctx, 1, 2, RerunRequest{SubmissionIDs: []int64{3}}); !errors.Is(err, app.ErrInvalid) || len(r.assignment) != 0 {
-		t.Fatalf("a request is refused: %v", err)
-	}
+		if id, err := s.EnsureChecklist(ctx, 2, false, false); err != nil || id != 0 {
+			t.Fatalf("%s: no checklist is built: %d %v", where, id, err)
+		}
 
-	if err := s.Recheck(ctx, 7, nil); !errors.Is(err, app.ErrInvalid) || len(r.one) != 0 {
-		t.Fatalf("one work: %v", err)
-	}
+		if _, err := s.Rerun(ctx, 1, 2, RerunRequest{SubmissionIDs: []int64{3}}); !errors.Is(err, app.ErrInvalid) || len(r.assignment) != 0 {
+			t.Fatalf("%s: a request is refused: %v", where, err)
+		}
 
-	page, err := s.Checklist(ctx, 2)
-	if err != nil || !strings.Contains(page.ModelsProblem, "AI check is off") {
-		t.Fatalf("the page says why: %+v %v", page.ModelsProblem, err)
+		if err := s.Recheck(ctx, 7, nil); !errors.Is(err, app.ErrInvalid) || len(r.one) != 0 {
+			t.Fatalf("%s: one work: %v", where, err)
+		}
+
+		page, err := s.Checklist(ctx, 2)
+		if err != nil || !strings.Contains(page.ModelsProblem, "AI check is off") || !strings.Contains(page.ModelsProblem, where) {
+			t.Fatalf("%s: the page says why: %+v %v", where, page.ModelsProblem, err)
+		}
 	}
 }
 
@@ -390,17 +399,32 @@ func TestQueueWorksFollowsTheJob(t *testing.T) {
 	if ids, err := s.QueueWorks(ctx, Job{SubmissionIDs: []int64{9}, Experiment: true}); err != nil || !slices.Equal(ids, []int64{9}) || st.queued != nil {
 		t.Fatalf("an experiment leaves the status alone: %v %v queued %v", ids, err, st.queued)
 	}
+
+	st.aiGroups, st.groups = []string{"G-1"}, nil
+	if _, err := s.QueueWorks(ctx, Job{AssignmentID: 2, FromSync: true}); err != nil || !slices.Equal(st.groups, []string{"G-1"}) {
+		t.Fatalf("a sync takes the works of the course's AI groups: %v %v", st.groups, err)
+	}
+
+	st.groups = []string{"untouched"}
+	if ids, err := s.QueueWorks(ctx, Job{AssignmentID: 2, SubmissionIDs: []int64{7}}); err != nil || !slices.Equal(ids, []int64{7}) || st.groups[0] != "untouched" {
+		t.Fatalf("works the teacher chose are checked whatever their group: %v %v", ids, err)
+	}
 }
 
 type queueStore struct {
 	Store
-	ids, queued []int64
-	graded      bool
+	ids, queued      []int64
+	graded           bool
+	aiGroups, groups []string
 }
 
 func (f *queueStore) CourseSettings(context.Context, int64) (course.Settings, error) {
-	return course.Defaults(), nil
+	c := course.Defaults()
+	c.AIGroups = f.aiGroups
+	return c, nil
 }
+
+func (f *queueStore) AssignmentAICheck(context.Context, int64) (bool, error) { return true, nil }
 
 func (f *queueStore) AssignmentText(context.Context, int64) (work.Assignment, error) {
 	return work.Assignment{}, nil
@@ -410,8 +434,8 @@ func (f *queueStore) PromptOverrides(context.Context, int64) (map[string]string,
 	return map[string]string{"rubric.model": "m", "check.model": "m"}, nil
 }
 
-func (f *queueStore) SubmittedIDs(_ context.Context, _ int64, graded bool) ([]int64, error) {
-	f.graded = graded
+func (f *queueStore) SubmittedIDs(_ context.Context, _ int64, graded bool, groups []string) ([]int64, error) {
+	f.graded, f.groups = graded, groups
 	return f.ids, nil
 }
 

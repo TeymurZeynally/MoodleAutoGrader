@@ -39,11 +39,11 @@ func (s *Store) AssignmentTargets(ctx context.Context, courseID int64) ([]seedin
 func (s *Store) SeedSettings(ctx context.Context, courseID int64, c course.Settings) error {
 	_, err := s.db.Exec(ctx, `insert into settings.course_settings (course_id, track_deadlines, late_penalty_enabled, late_penalty, require_code, extras_enabled,
 		late_notice, max_images, partial_credit, points_step, similar_percent, copy_percent, copy_identical_files, template_min_works, template_share,
-		code_extensions, ignored_dirs, download_files, ai_check)
-		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) on conflict (course_id) do nothing`,
+		code_extensions, ignored_dirs, download_files, ai_check, ai_groups, read_all_pages)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) on conflict (course_id) do nothing`,
 		courseID, c.TrackDeadlines, c.LatePenaltyEnabled, c.LatePenalty, c.RequireCode, c.ExtrasEnabled,
 		c.LateNotice, c.MaxImages, c.PartialCredit, c.PointsStep, c.SimilarPercent, c.CopyPercent, c.CopyIdenticalFiles, c.TemplateMinWorks, c.TemplateShare,
-		nonNil(c.CodeExtensions), nonNil(c.IgnoredDirs), c.DownloadFiles, c.AICheck)
+		nonNil(c.CodeExtensions), nonNil(c.IgnoredDirs), c.DownloadFiles, c.AICheck, nonNil(c.AIGroups), c.ReadAllPages)
 	return wrap("seed course settings", err)
 }
 

@@ -2,6 +2,7 @@ package llm
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -206,4 +207,33 @@ func scoreExtras(t *testing.T, extras []assessment.Criterion, raw json.RawMessag
 	}
 
 	return assessment.ScoreExtras(extras, r.Extras, in)
+}
+
+// A report is read whole, up to its budget and what the code leaves of its own. A page is read up to its budget, and
+// less on the second try with a smaller share.
+func TestAReportGetsTheBudgetTheCodeLeaves(t *testing.T) {
+	long := strings.Repeat("Отчёт по лабораторной работе. ", 1500) // 82500 bytes: twenty pages of Russian text
+	if in := PrepareInput(work.Snapshot{Report: long}, nil, nil); in.Report != long || in.Truncated {
+		t.Fatalf("a long report is read whole: %d of %d bytes, truncated %v", len(in.Report), len(long), in.Truncated)
+	}
+
+	code := []work.CodeFile{}
+	for i := range 10 {
+		code = append(code, work.CodeFile{Path: fmt.Sprintf("Lab/F%d.cs", i), Text: strings.Repeat("x", fileBudget-100)})
+	}
+
+	huge := strings.Repeat(long, 4)
+	left := codeBudget - 5*(fileBudget-100) // five files fit into the code budget
+	if in := PrepareInput(work.Snapshot{Report: huge, Code: code}, nil, nil); len(in.Report) != reportBudget+left+len(" …") || !in.Truncated {
+		t.Fatalf("a report gets its budget and what the code left: %d bytes, truncated %v", len(in.Report), in.Truncated)
+	}
+
+	page := []assessment.PageNote{{Source: "report.docx p.3", Transcript: strings.Repeat("Подпись блока ", 600)}}
+	if in := PrepareInput(work.Snapshot{}, page, nil); len(in.Pages[0].Transcript) > pageBudget+len(" …") || !in.Truncated || len(page[0].Transcript) < pageBudget {
+		t.Fatalf("a page is read up to its budget, the caller's copy untouched: %d bytes", len(in.Pages[0].Transcript))
+	}
+
+	if in := PrepareInputShare(work.Snapshot{}, page, nil, 0.5); len(in.Pages[0].Transcript) > pageBudget/2+len(" …") {
+		t.Fatalf("a smaller share reads less of a page: %d bytes", len(in.Pages[0].Transcript))
+	}
 }

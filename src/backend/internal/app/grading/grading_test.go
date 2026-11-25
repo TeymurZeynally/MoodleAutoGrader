@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"moodle-autograder/internal/app"
+	"moodle-autograder/internal/domain/assessment"
 )
 
 type fakeStore struct {
@@ -104,5 +105,44 @@ func TestTheSheetOfAStudentLinksEachAssignmentInMoodle(t *testing.T) {
 
 	if _, err := s.StudentSheet(context.Background(), 3, 5); !errors.Is(err, app.ErrNotFound) {
 		t.Fatalf("a student of another course: %v", err)
+	}
+}
+
+type exportStore struct {
+	sheetStore
+	results map[int64]assessment.Result
+}
+
+func (exportStore) Assignment(context.Context, int64) (Header, error) {
+	return Header{ID: 4, Name: "Lab"}, nil
+}
+func (f exportStore) Submissions(context.Context, int64) ([]Row, error) { return f.rows, nil }
+func (f exportStore) AIResults(context.Context, int64) (map[int64]assessment.Result, error) {
+	return f.results, nil
+}
+
+func (exportStore) LatestChecklist(context.Context, int64) (assessment.Checklist, bool, error) {
+	return assessment.Checklist{Criteria: []assessment.Criterion{{ID: "c1", Text: "Report", Points: 5}}}, true, nil
+}
+
+func TestTheExportHoldsTheSubmittedWorksWithTheirAICheckAndLink(t *testing.T) {
+	st := exportStore{rows: []Row{
+		{ID: 0, Student: "Not submitted"},
+		{ID: 7, Student: "Draft only", MoodleStatus: "draft"},
+		{ID: 8, Student: "Checked", MoodleStatus: "submitted", CMID: 30, MoodleUserID: 12},
+		{ID: 9, Student: "Not analyzed", MoodleStatus: "submitted"},
+	}, results: map[int64]assessment.Result{8: {Score: 5}}}
+	s := &Service{Store: st, MoodleURL: "https://moodle.example"}
+	e, err := s.Export(context.Background(), 4)
+	if err != nil || len(e.Works) != 2 || len(e.Criteria) != 1 {
+		t.Fatalf("only submitted works: %+v %v", e, err)
+	}
+
+	if w := e.Works[0]; w.Student != "Checked" || w.AI == nil || w.AI.Score != 5 || w.GraderURL != "https://moodle.example/mod/assign/view.php?id=30&action=grader&userid=12" {
+		t.Fatalf("a checked work: %+v", w)
+	}
+
+	if e.Works[1].AI != nil {
+		t.Fatalf("a work not analyzed has no AI check: %+v", e.Works[1])
 	}
 }

@@ -162,8 +162,10 @@ func (s *Store) FileList(ctx context.Context, files []work.File, codeExtensions,
 	return out
 }
 
-// Images gathers up to limit pictures: PDF pages with images (rendered by toolsd), DOCX media, archive images.
-func (s *Store) Images(ctx context.Context, files []work.File, limit int) []assessing.Image {
+// Images gathers up to limit pictures: PDF pages with images, or with allPages every page (rendered by toolsd), the
+// pages of Word documents laid out as PDFs the same way, archive images. A Word document that cannot be laid out gives
+// its embedded pictures.
+func (s *Store) Images(ctx context.Context, files []work.File, limit int, allPages bool) []assessing.Image {
 	var out []assessing.Image
 	for _, f := range files {
 		if len(out) >= limit || f.Key == "" {
@@ -174,8 +176,19 @@ func (s *Store) Images(ctx context.Context, files []work.File, limit int) []asse
 			continue
 		}
 		name := strings.TrimPrefix(f.Name, "/")
-		if kind, _ := extract.Detect(name, data); kind == "pdf" {
-			pages, _, err := s.Tools.PDFImagePages(ctx, data, limit-len(out), 1280) // small text on screenshots stays readable
+		kind, _ := extract.Detect(name, data)
+		if kind == "docx" {
+			if pdf, err := s.Tools.DocPDF(ctx, data); err == nil {
+				data, kind = pdf, "pdf"
+			}
+		}
+
+		if kind == "pdf" {
+			size := 1280 // small text on screenshots stays readable
+			if allPages {
+				size = 1600 // whole pages of drawings: their labels are smaller
+			}
+			pages, _, err := s.Tools.PDFPages(ctx, data, limit-len(out), size, allPages)
 			if err != nil {
 				continue
 			}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"moodle-autograder/internal/app/assessing"
 	"moodle-autograder/internal/domain/assessment"
@@ -174,4 +175,29 @@ func (s *Store) CurrentActivity(ctx context.Context) (*assessing.Activity, error
 	}
 
 	return &a, nil
+}
+
+// AIResults are the finished AI checks of the works of an assignment, by submission.
+func (s *Store) AIResults(ctx context.Context, assignmentID int64) (map[int64]assessment.Result, error) {
+	rows, err := s.db.Query(ctx, `select a.submission_id, a.result from ai.assessments a join moodle.submissions s on s.id = a.submission_id
+		where s.assignment_id = $1 and a.result is not null`, assignmentID)
+	if err != nil {
+		return nil, wrap("ai results", err)
+	}
+
+	out := map[int64]assessment.Result{}
+	_, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (struct{}, error) {
+		var id int64
+		var raw []byte
+		if err := r.Scan(&id, &raw); err != nil {
+			return struct{}{}, err
+		}
+		var res assessment.Result
+		if err := json.Unmarshal(raw, &res); err != nil {
+			return struct{}{}, fmt.Errorf("decode the ai result of %d: %w", id, err)
+		}
+		out[id] = res
+		return struct{}{}, nil
+	})
+	return out, wrap("scan ai results", err)
 }

@@ -1,11 +1,14 @@
-// toolsd runs document utilities (poppler) for the autograder in an isolated container: no network, no secrets,
-// read-only filesystem, a fresh temp dir and a deadline per request.
+// toolsd runs document utilities (poppler, LibreOffice) for the autograder in an isolated container: no network, no
+// secrets, read-only filesystem, a fresh temp dir and a deadline per request.
 //
-// POST /pdf/pages?max=N&size=PX  body: a PDF
+// POST /pdf/pages?max=N&size=PX[&all=1]  body: a PDF
 //
 //	-> {"pages": [{"page": 3, "png": "<base64>"}], "total": 12}
 //
-// Only pages that contain images are rendered: text pages are read by the text extractor instead.
+// Only pages that contain images are rendered, text pages are read by the text extractor instead; with all=1 every
+// page is, so drawings made of lines are seen too.
+//
+// POST /doc/pdf  body: a Word document (DOCX or DOC)  -> the document laid out as a PDF
 //
 // POST /pdf/text  body: a PDF
 //
@@ -77,6 +80,7 @@ func main() {
 	mux.HandleFunc("POST /archive/list", archiveList)
 	mux.HandleFunc("POST /archive/open", archiveOpen)
 	mux.HandleFunc("POST /docx/text", docxText)
+	mux.HandleFunc("POST /doc/pdf", docPDF)
 	slog.Info("tools listening", "addr", ":8080")
 	srv := &http.Server{Addr: ":8080", Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	if err := srv.ListenAndServe(); err != nil {
@@ -229,6 +233,13 @@ func pages(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fail(w, http.StatusUnprocessableEntity, err)
 		return
+	}
+
+	if r.URL.Query().Get("all") == "1" {
+		withImages = make([]int, total)
+		for i := range withImages {
+			withImages[i] = i + 1
+		}
 	}
 
 	out := struct {

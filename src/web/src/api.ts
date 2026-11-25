@@ -7,17 +7,17 @@ export interface Progress {
 
 export interface Course { id: number; moodle_id: number; name: string; connected: boolean; sync_status: string; sync_error: string | null; last_synced_at: string | null; progress: Progress }
 export interface AIProgress { queued: number; running: number; done: number; needs_attention: number; failed: number; has_checklist: boolean }
-export interface Assignment { id: number; name: string; due_at: string | null; max_grade: number | null; marking_workflow: boolean; submitted: number; flagged: number; published: number; ai: AIProgress }
+export interface Assignment { id: number; name: string; due_at: string | null; max_grade: number | null; marking_workflow: boolean; submitted: number; flagged: number; published: number; ai: AIProgress; ai_check: boolean }
 // Rerun says whether a re-analysis waits for the check of the assignment that is running now.
 export interface Rerun { queued: boolean }
-export interface AssignmentHeader { id: number; name: string; due_at: string | null; max_grade: number | null; course_id: number; course_name: string }
+export interface AssignmentHeader { id: number; name: string; due_at: string | null; max_grade: number | null; course_id: number; course_name: string; ai_check: boolean }
 export interface Match { other_id: number; student: string; short_name: string; groups: string[]; submitted_at: string | null; code_similarity: number; report_similarity: number; identical_files: number; severity: string }
 // MoodleAttempt is one attempt of a student as Moodle has it; attempt counts from 0.
 export interface MoodleAttempt { attempt: number; status: string; submitted_at: string | null; files: string[]; grade: number | null; graded_at: string | null; comment: string; submission_id: number | null }
 
 // Submission is a row of a grade sheet: one student on one assignment, with or without a work.
 export interface Submission {
-  assignment_id: number; assignment: string; due_at: string | null; max_grade: number | null; moodle_grader_url: string; has_checklist: boolean
+  assignment_id: number; assignment: string; due_at: string | null; max_grade: number | null; moodle_grader_url: string; has_checklist: boolean; ai_check: boolean
   id: number; student_id: number; moodle_user_id: number; student: string; short_name: string; enrolled: boolean; moodle_grade: number | null; graded_at: string | null; attempts: MoodleAttempt[]; groups: string[]; moodle_status: string; submitted_at: string | null; files: string[]; flags: string[]; integrity: 'ok' | 'medium' | 'high'
   points: number | null; comment: string; source: string; version: number; state: string; publish_error: string | null; matches: Match[] | null
   ai: AISummary | null; late: boolean; attempt: number; resubmitted: boolean; open_attempt: number | null; open_status: string
@@ -43,7 +43,7 @@ export interface Checklist {
 export interface CourseSettings {
   track_deadlines: boolean; late_penalty_enabled: boolean; late_penalty: number; late_notice: string
   require_code: boolean; extras_enabled: boolean
-  ai_check: boolean; max_images: number; partial_credit: number; points_step: number
+  ai_check: boolean; ai_groups: string[]; max_images: number; read_all_pages: boolean; partial_credit: number; points_step: number
   similar_percent: number; copy_percent: number; copy_identical_files: number; template_min_works: number; template_share: number
   download_files: boolean; code_extensions: string[]; ignored_dirs: string[]
 }
@@ -115,6 +115,7 @@ export const api = {
   saveChecklist: (assignmentId: number, criteria: { text: string; where: Place; points: number }[], extras: { text: string; where: Place }[]) => call<void>('PUT', `/api/assignments/${assignmentId}/checklist`, { criteria, extras }),
   approveChecklist: (assignmentId: number) => call<void>('POST', `/api/assignments/${assignmentId}/checklist/approve`),
   saveNotes: (assignmentId: number, notes: string) => call<void>('PUT', `/api/assignments/${assignmentId}/notes`, { notes }),
+  setAICheck: (assignmentId: number, on: boolean) => call<void>('PUT', `/api/assignments/${assignmentId}/ai-check`, { on }),
   promptPreview: (assignmentId: number) => call<PreviewStep[]>('GET', `/api/assignments/${assignmentId}/prompt-preview`),
   prompts: (courseId: number) => call<PromptStep[]>('GET', `/api/courses/${courseId}/prompts`),
   aiStatus: () => call<AIStatus>('GET', '/api/ai/status'),

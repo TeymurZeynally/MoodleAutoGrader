@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, App, Breadcrumb, Button, Card, Collapse, Empty, Flex, Input, Popconfirm, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { CheckOutlined, CloudUploadOutlined, SyncOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { CheckOutlined, CloudUploadOutlined, FileExcelOutlined, SyncOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { api, AssignmentHeader, CourseSettings, errText, Submission } from '../api'
 import { usePoll } from '../App'
 import { AssignmentDescription, ChecklistCard } from './AICheck'
@@ -120,13 +120,14 @@ export function AssignmentPage({ id }: { id: number }) {
           <Input.Search placeholder="Find a student" allowClear value={query} onChange={e => setQuery(e.target.value)} style={{ width: 220 }} />
           <span style={{ flex: 1 }} />
           <Space>
+            <Tooltip title="The submitted works as an Excel file for the teacher of the course: originality, a column per criterion, the drafts and comments, the reasons of the AI check, a link to each work in Moodle"><Button icon={<FileExcelOutlined />} href={`/api/assignments/${id}/export`} download>Export</Button></Tooltip>
             {max !== null && settings?.download_files !== false && <Popconfirm title={`Set ${max} points for ${toFill.length} works?`} description="Only works that are original, have code and no flags, and have no points yet (no AI check result)." onConfirm={fillMax} disabled={!toFill.length}>
               <Tooltip title="Without the AI review nobody checked these works against the assignment: this gives them full points as drafts for you to review">
                 <Button icon={<ThunderboltOutlined />} disabled={!toFill.length} loading={busy}>Full points for clean works ({toFill.length})</Button>
               </Tooltip>
             </Popconfirm>}
             <Tooltip title="Drafts nothing asks you to look at: no strong similarity, no flags, an AI check without remarks; and drafts you saved yourself. Others can be ticked one by one."><Button icon={<CheckOutlined />} onClick={() => setSelected(scope.filter(s => ready(s) && unremarkable(s) && !dirty(s)).map(s => s.id))}>Select ready</Button></Tooltip>
-            {selected.length > 0 && hasChecklist && settings?.ai_check !== false && <Popconfirm title={`Analyze ${selected.length} chosen work(s) again with the AI check?`} onConfirm={() => reanalyze(selected)}>
+            {selected.length > 0 && hasChecklist && settings?.ai_check !== false && head?.ai_check !== false && <Popconfirm title={`Analyze ${selected.length} chosen work(s) again with the AI check?`} onConfirm={() => reanalyze(selected)}>
               <Button icon={<SyncOutlined />} loading={busy}>Re-analyze selected ({selected.length})</Button>
             </Popconfirm>}
             <Popconfirm title={`Publish ${publishable.length} grade(s) to Moodle?`} onConfirm={() => publish(publishable)} disabled={!publishable.length}>

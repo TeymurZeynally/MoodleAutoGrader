@@ -28,7 +28,8 @@ func (s *Store) Assignments(ctx context.Context, courseID int64) ([]courses.Assi
 		(select count(distinct s.student_id) from moodle.submissions s where s.assignment_id = a.id and s.moodle_status = 'submitted'),
 		(select count(distinct s.student_id) from moodle.submissions s join grading.grade_drafts d on d.submission_id = s.id where s.assignment_id = a.id and d.integrity = 'high'),
 		(select count(distinct s.student_id) from moodle.submissions s join grading.grade_drafts d on d.submission_id = s.id where s.assignment_id = a.id and d.state = 'published'),
-		ai.queued, ai.running, ai.done, ai.attention, ai.failed, exists(select 1 from ai.checklists r where r.assignment_id = a.id)
+		ai.queued, ai.running, ai.done, ai.attention, ai.failed, exists(select 1 from ai.checklists r where r.assignment_id = a.id),
+		coalesce((select x.ai_check from settings.assignment_settings x where x.assignment_id = a.id), true)
 		from moodle.assignments a
 		cross join lateral (select count(*) filter (where x.status = 'queued') queued, count(*) filter (where x.status = 'running') running,
 			count(*) filter (where x.status = 'done') done, count(*) filter (where x.status = 'needs_attention') attention, count(*) filter (where x.status = 'failed') failed
@@ -41,16 +42,17 @@ func (s *Store) Assignments(ctx context.Context, courseID int64) ([]courses.Assi
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (courses.Assignment, error) {
 		var a courses.Assignment
 		err := r.Scan(&a.ID, &a.Name, &a.DueAt, &a.MaxGrade, &a.MarkingWorkflow, &a.Submitted, &a.Flagged, &a.Published,
-			&a.AI.Queued, &a.AI.Running, &a.AI.Done, &a.AI.NeedsAttention, &a.AI.Failed, &a.AI.HasChecklist)
+			&a.AI.Queued, &a.AI.Running, &a.AI.Done, &a.AI.NeedsAttention, &a.AI.Failed, &a.AI.HasChecklist, &a.AICheck)
 		return a, err
 	})
 }
 
 func (s *Store) Assignment(ctx context.Context, assignmentID int64) (grading.Header, error) {
 	var h grading.Header
-	err := s.db.QueryRow(ctx, `select a.id, a.name, a.due_at, a.max_grade::float8, c.id, c.full_name, a.cmid
+	err := s.db.QueryRow(ctx, `select a.id, a.name, a.due_at, a.max_grade::float8, c.id, c.full_name, a.cmid,
+		coalesce((select x.ai_check from settings.assignment_settings x where x.assignment_id = a.id), true)
 		from moodle.assignments a join moodle.courses c on c.id = a.course_id where a.id = $1`, assignmentID).
-		Scan(&h.ID, &h.Name, &h.DueAt, &h.MaxGrade, &h.CourseID, &h.CourseName, &h.CMID)
+		Scan(&h.ID, &h.Name, &h.DueAt, &h.MaxGrade, &h.CourseID, &h.CourseName, &h.CMID, &h.AICheck)
 	return h, found("assignment", err)
 }
 

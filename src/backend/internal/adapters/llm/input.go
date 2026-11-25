@@ -15,9 +15,10 @@ import (
 )
 
 const (
-	codeBudget   = 45000 // characters of code sent to the model (about 15k tokens)
-	fileBudget   = 8000  // per file
-	reportBudget = 16000
+	codeBudget   = 45000  // characters of code sent to the model (about 15k tokens)
+	fileBudget   = 8000   // per file
+	reportBudget = 200000 // bytes, about 100000 letters of Russian: a report is read whole; what does not fit the model is tried again with less
+	pageBudget   = 8000   // of the text read off one picture: a whole page of a report in Russian
 	notesBudget  = 12000
 )
 
@@ -27,10 +28,11 @@ func PrepareInput(snap work.Snapshot, pages []assessment.PageNote, upload []stri
 	return PrepareInputShare(snap, pages, upload, 1)
 }
 
-// PrepareInputShare is PrepareInput with the code and report budgets scaled by share (0 < share <= 1), for a second
-// try when the work did not fit into the model context. Smaller files are kept first.
+// PrepareInputShare is PrepareInput with the budgets scaled by share (0 < share <= 1), for a second try when the work
+// did not fit into the model context. Smaller files are kept first. The report gets its own budget and what the code
+// left of its own.
 func PrepareInputShare(snap work.Snapshot, pages []assessment.PageNote, upload []string, share float64) assessment.Work {
-	codeBudget, reportBudget := int(float64(codeBudget)*share), int(float64(reportBudget)*share)
+	codeBudget, reportBudget, pageBudget := int(float64(codeBudget)*share), int(float64(reportBudget)*share), int(float64(pageBudget)*share)
 	if len(upload) > maxFileList {
 		upload = append(upload[:maxFileList:maxFileList], fmt.Sprintf("… and %d more files", len(upload)-maxFileList))
 	}
@@ -42,7 +44,14 @@ func PrepareInputShare(snap work.Snapshot, pages []assessment.PageNote, upload [
 		sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
 	}
 
-	in := assessment.Work{Report: clip(snap.Report, reportBudget), Pages: pages, Files: upload, Truncated: len(snap.Report) > reportBudget || share < 1}
+	in := assessment.Work{Files: upload, Truncated: share < 1}
+	for _, p := range pages {
+		if len(p.Transcript) > pageBudget {
+			p.Transcript, in.Truncated = clip(p.Transcript, pageBudget), true
+		}
+		in.Pages = append(in.Pages, p)
+	}
+
 	used := 0
 	for _, f := range files {
 		if integrity.Generated(f.Path) || strings.HasSuffix(strings.ToLower(f.Path), ".csproj") {
@@ -60,6 +69,12 @@ func PrepareInputShare(snap work.Snapshot, pages []assessment.PageNote, upload [
 		in.Code = append(in.Code, work.CodeFile{Path: f.Path, Text: text})
 	}
 
+	report := reportBudget + codeBudget - used
+	if len(snap.Report) > report {
+		in.Truncated = true
+	}
+
+	in.Report = clip(snap.Report, report)
 	return in
 }
 
@@ -92,7 +107,7 @@ func WorkText(in assessment.Work) string {
 	fmt.Fprintf(&work, "=== report text\n%s\n", in.Report)
 	fmt.Fprintf(&work, "=== files in the upload\n%s\n", strings.Join(in.Files, "\n"))
 	for _, pg := range in.Pages {
-		fmt.Fprintf(&work, "=== screenshot %s\n%s\n%s\n", pg.Source, pg.Description, clip(pg.Transcript, 1500))
+		fmt.Fprintf(&work, "=== screenshot %s\n%s\n%s\n", pg.Source, pg.Description, pg.Transcript) // clipped by PrepareInputShare
 		for _, a := range pg.Addressed {
 			fmt.Fprintf(&work, "text on this picture addressed to its reader: %s\n", clip(a, 500))
 		}

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"moodle-autograder/internal/app"
+	"moodle-autograder/internal/domain/assessment"
 )
 
 // Moodle writes one grade with the teacher's token. A grade Moodle refused fails with app.ErrInvalid; network
@@ -28,6 +29,10 @@ type Store interface {
 	// StudentSubmissions is the sheet of one student: a row per assignment of the course, by deadline.
 	StudentSubmissions(ctx context.Context, courseID, studentID int64) ([]Row, error)
 	MyGroups(ctx context.Context, userID, courseID int64) ([]string, error)
+	// AIResults are the finished AI checks of the works of an assignment, by submission.
+	AIResults(ctx context.Context, assignmentID int64) (map[int64]assessment.Result, error)
+	// LatestChecklist is the checklist the AI checks the assignment with; false when it has none.
+	LatestChecklist(ctx context.Context, assignmentID int64) (assessment.Checklist, bool, error)
 	// UpdateDraft saves the teacher's points and comment; app.ErrConflict when the draft changed since version.
 	UpdateDraft(ctx context.Context, submissionID, userID int64, points *float64, comment string, version int) error
 	// Approve snapshots the current draft; app.ErrInvalid when it has no points.
@@ -68,6 +73,7 @@ type Header struct {
 	CourseID   int64      `json:"course_id"`
 	CourseName string     `json:"course_name"`
 	CMID       int64      `json:"cmid"` // the assignment's course module in Moodle, for links to its pages
+	AICheck    bool       `json:"ai_check"`
 }
 
 // AttemptInfo is one attempt of a student as Moodle has it. Moodle numbers attempts from 0.
@@ -93,6 +99,7 @@ type Row struct {
 	CMID         int64      `json:"-"`
 	GraderURL    string     `json:"moodle_grader_url"` // the grading page of this student on this assignment in Moodle
 	HasChecklist bool       `json:"has_checklist"`     // the assignment has a checklist: its works can be analyzed again
+	AICheck      bool       `json:"ai_check"`          // the AI check is on for the assignment
 	StudentID    int64      `json:"student_id"`
 	MoodleUserID int64      `json:"moodle_user_id"`
 	Student      string     `json:"student"`

@@ -34,6 +34,8 @@ type Archives interface {
 	// Detect decides by content how the browser may show bytes: the kind and the Content-Type.
 	Detect(name string, data []byte) (kind, contentType string)
 	DocxText(ctx context.Context, data []byte) string
+	// DocPDF lays out a Word document as a PDF.
+	DocPDF(ctx context.Context, data []byte) ([]byte, error)
 	MaxViewBytes() int
 }
 
@@ -109,8 +111,8 @@ type Content struct {
 	Attachment bool // not something a browser shows: download it
 }
 
-// Open returns one file for the viewer; asText turns a DOCX into its text.
-func (s *Service) Open(ctx context.Context, submissionID, fileID int64, inner []string, asText bool) (Content, error) {
+// Open returns one file for the viewer; as "text" turns a Word document into its text, as "pdf" into its pages.
+func (s *Service) Open(ctx context.Context, submissionID, fileID int64, inner []string, as string) (Content, error) {
 	f, data, err := s.uploaded(ctx, submissionID, fileID)
 	if err != nil {
 		return Content{}, err
@@ -122,8 +124,15 @@ func (s *Service) Open(ctx context.Context, submissionID, fileID int64, inner []
 	}
 
 	kind, ctype := s.Archives.Detect(name, data)
-	if asText && kind == "docx" {
+	switch {
+	case as == "text" && kind == "docx":
 		data, ctype = []byte(s.Archives.DocxText(ctx, data)), "text/plain; charset=utf-8"
+	case as == "pdf" && kind == "docx":
+		pdf, err := s.Archives.DocPDF(ctx, data)
+		if err != nil {
+			return Content{}, app.Fail(app.ErrInvalid, "%s", err.Error())
+		}
+		data, ctype = pdf, "application/pdf"
 	}
 
 	if limit := s.Archives.MaxViewBytes(); len(data) > limit {

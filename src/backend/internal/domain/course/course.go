@@ -23,10 +23,12 @@ type Settings struct {
 	ExtrasEnabled bool `json:"extras_enabled"` // checklists have extra tasks, checked but not scored
 
 	// AI check.
-	AICheck       bool    `json:"ai_check"`       // off: no work of the course is analyzed and no checklist is built
-	MaxImages     int     `json:"max_images"`     // pictures of one work the model reads: PDF pages with images, screenshots
-	PartialCredit float64 `json:"partial_credit"` // share of a criterion's points for "partial", from 0 to 1
-	PointsStep    float64 `json:"points_step"`    // points of a generated checklist are rounded to this step
+	AICheck       bool     `json:"ai_check"`       // off: no work of the course is analyzed and no checklist is built
+	AIGroups      []string `json:"ai_groups"`      // groups whose works the AI checks by itself; empty: every group
+	MaxImages     int      `json:"max_images"`     // pictures of one work the model reads: PDF pages with images, screenshots
+	ReadAllPages  bool     `json:"read_all_pages"` // the model reads every page of a PDF or Word report, not only pages with images
+	PartialCredit float64  `json:"partial_credit"` // share of a criterion's points for "partial", from 0 to 1
+	PointsStep    float64  `json:"points_step"`    // points of a generated checklist are rounded to this step
 
 	// Similarity check.
 	SimilarPercent     float64 `json:"similar_percent"`      // code or report similarity from which a pair is "Similar"
@@ -49,7 +51,7 @@ func Defaults() Settings {
 	return Settings{
 		TrackDeadlines: true, LatePenaltyEnabled: true, LatePenalty: 1, LateNotice: "Минус {points} за сдачу после дедлайна.",
 		RequireCode: true,
-		AICheck:     true, MaxImages: 16, PartialCredit: 0.5, PointsStep: 0.5,
+		AICheck:     true, AIGroups: []string{}, MaxImages: 16, PartialCredit: 0.5, PointsStep: 0.5,
 		SimilarPercent: 50, CopyPercent: 75, CopyIdenticalFiles: 2, TemplateMinWorks: 10, TemplateShare: 0.5,
 		DownloadFiles: true,
 		CodeExtensions: []string{
@@ -66,12 +68,16 @@ func Defaults() Settings {
 // Penalize reports whether late works lose points.
 func (c Settings) Penalize() bool { return c.TrackDeadlines && c.LatePenaltyEnabled }
 
-// Normalize cleans what a teacher typed: extensions get a dot and lower case, folders lower case, duplicates go.
+// Normalize cleans what a teacher typed: extensions get a dot and lower case, folders lower case, duplicates go. Group
+// names are Moodle's and keep their case.
 func (c Settings) Normalize() Settings {
-	clean := func(in []string, dot bool) []string {
+	clean := func(in []string, dot, lower bool) []string {
 		out := []string{}
 		for _, s := range in {
-			s = strings.ToLower(strings.TrimSpace(s))
+			s = strings.TrimSpace(s)
+			if lower {
+				s = strings.ToLower(s)
+			}
 			if dot && s != "" && !strings.HasPrefix(s, ".") {
 				s = "." + s
 			}
@@ -82,7 +88,7 @@ func (c Settings) Normalize() Settings {
 		slices.Sort(out)
 		return out
 	}
-	c.CodeExtensions, c.IgnoredDirs = clean(c.CodeExtensions, true), clean(c.IgnoredDirs, false)
+	c.CodeExtensions, c.IgnoredDirs, c.AIGroups = clean(c.CodeExtensions, true, true), clean(c.IgnoredDirs, false, true), clean(c.AIGroups, false, false)
 	c.LateNotice = strings.TrimSpace(c.LateNotice)
 	return c
 }

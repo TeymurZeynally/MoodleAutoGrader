@@ -21,7 +21,8 @@ func (s *Service) FailWorks(ctx context.Context, ids []int64, reason string) err
 }
 
 // QueueWorks picks the works of a job and marks them queued; an experiment leaves their status alone. Without models to
-// run on nothing is queued: the works wait for the next sync, and the assignment's page says what is missing.
+// run on nothing is queued: the works wait for the next sync, and the assignment's page says what is missing. A job
+// that names no works takes those of the course's AI groups; works the teacher chose are checked whatever their group.
 func (s *Service) QueueWorks(ctx context.Context, q Job) ([]int64, error) {
 	if !s.Enabled() {
 		return nil, nil
@@ -32,14 +33,18 @@ func (s *Service) QueueWorks(ctx context.Context, q Job) ([]int64, error) {
 		return nil, err
 	}
 
-	if problem, err := s.modelsProblem(ctx, t.CourseID, q.Models); err != nil || problem != "" {
+	if problem, err := s.modelsProblem(ctx, t.CourseID, q.AssignmentID, q.Models); err != nil || problem != "" {
 		return nil, err
 	}
 
 	ids := q.SubmissionIDs
 	if len(ids) == 0 {
-		var err error
-		if ids, err = s.Store.SubmittedIDs(ctx, q.AssignmentID, q.IncludeGraded && !q.FromSync); err != nil {
+		settings, err := s.Store.CourseSettings(ctx, t.CourseID)
+		if err != nil {
+			return nil, err
+		}
+
+		if ids, err = s.Store.SubmittedIDs(ctx, q.AssignmentID, q.IncludeGraded && !q.FromSync, settings.AIGroups); err != nil {
 			return nil, err
 		}
 	}
@@ -95,7 +100,7 @@ func (s *Service) Rerun(ctx context.Context, userID, assignmentID int64, r Rerun
 		return false, err
 	}
 
-	if err := s.requireModels(ctx, t.CourseID, r.Models); err != nil {
+	if err := s.requireModels(ctx, t.CourseID, assignmentID, r.Models); err != nil {
 		return false, err
 	}
 
@@ -142,7 +147,7 @@ func (s *Service) Rerun(ctx context.Context, userID, assignmentID int64, r Rerun
 // chosen keeps the works of the assignment among the ones the teacher picked: an id of another assignment's work is
 // refused, as it would be checked against this checklist.
 func (s *Service) chosen(ctx context.Context, assignmentID int64, picked []int64) ([]int64, error) {
-	own, err := s.Store.SubmittedIDs(ctx, assignmentID, true)
+	own, err := s.Store.SubmittedIDs(ctx, assignmentID, true, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +184,7 @@ func (s *Service) startWork(ctx context.Context, submissionID int64, job Job) er
 		return err
 	}
 
-	if err := s.requireModels(ctx, info.CourseID, job.Models); err != nil {
+	if err := s.requireModels(ctx, info.CourseID, info.AssignmentID, job.Models); err != nil {
 		return err
 	}
 

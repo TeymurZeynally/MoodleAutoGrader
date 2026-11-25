@@ -52,6 +52,8 @@ func (f *fakeStore) CourseSettings(context.Context, int64) (course.Settings, err
 	return f.settings, nil
 }
 
+func (f *fakeStore) AssignmentAICheck(context.Context, int64) (bool, error) { return true, nil }
+
 func (f *fakeStore) AssessmentHash(context.Context, int64) (string, error) { return f.prevHash, nil }
 
 func (f *fakeStore) PreviousComment(context.Context, int64) (string, *time.Time, error) {
@@ -93,7 +95,7 @@ func (fakeUploads) Snapshot(context.Context, int64) (work.Snapshot, error) {
 func (fakeUploads) FileList(context.Context, []work.File, []string, []string) []string {
 	return []string{"report.pdf"}
 }
-func (fakeUploads) Images(context.Context, []work.File, int) []Image { return nil }
+func (fakeUploads) Images(context.Context, []work.File, int, bool) []Image { return nil }
 
 // fakeAssessor answers like the model: c1 met with a quote from the report, c2 partial, the extra task met.
 type fakeAssessor struct {

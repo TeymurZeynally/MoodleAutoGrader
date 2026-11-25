@@ -43,10 +43,10 @@ func (s *Store) CourseSettings(ctx context.Context, courseID int64) (course.Sett
 	var code, ignored []string
 	err := s.db.QueryRow(ctx, `select track_deadlines, late_penalty_enabled, late_penalty::float8, require_code, extras_enabled,
 		late_notice, max_images, partial_credit::float8, points_step::float8, similar_percent::float8, copy_percent::float8, copy_identical_files,
-		template_min_works, template_share::float8, code_extensions, ignored_dirs, download_files, ai_check
+		template_min_works, template_share::float8, code_extensions, ignored_dirs, download_files, ai_check, ai_groups, read_all_pages
 		from settings.course_settings where course_id = $1`, courseID).
 		Scan(&c.TrackDeadlines, &c.LatePenaltyEnabled, &c.LatePenalty, &c.RequireCode, &c.ExtrasEnabled,
-			&notice, &images, &partial, &step, &similar, &copyPct, &copyFiles, &minWorks, &share, &code, &ignored, &c.DownloadFiles, &c.AICheck)
+			&notice, &images, &partial, &step, &similar, &copyPct, &copyFiles, &minWorks, &share, &code, &ignored, &c.DownloadFiles, &c.AICheck, &c.AIGroups, &c.ReadAllPages)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return c, nil
 	}
@@ -85,19 +85,36 @@ func set[T any](dst, v *T) {
 func (s *Store) SaveCourseSettings(ctx context.Context, courseID, userID int64, c course.Settings) error {
 	_, err := s.db.Exec(ctx, `insert into settings.course_settings (course_id, track_deadlines, late_penalty_enabled, late_penalty, require_code, extras_enabled,
 		late_notice, max_images, partial_credit, points_step, similar_percent, copy_percent, copy_identical_files, template_min_works, template_share,
-		code_extensions, ignored_dirs, download_files, ai_check, updated_by)
-		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+		code_extensions, ignored_dirs, download_files, ai_check, ai_groups, read_all_pages, updated_by)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
 		on conflict (course_id) do update set track_deadlines = excluded.track_deadlines, late_penalty_enabled = excluded.late_penalty_enabled,
 		late_penalty = excluded.late_penalty, require_code = excluded.require_code, extras_enabled = excluded.extras_enabled,
 		late_notice = excluded.late_notice, max_images = excluded.max_images, partial_credit = excluded.partial_credit, points_step = excluded.points_step,
 		similar_percent = excluded.similar_percent, copy_percent = excluded.copy_percent, copy_identical_files = excluded.copy_identical_files,
 		template_min_works = excluded.template_min_works, template_share = excluded.template_share,
 		code_extensions = excluded.code_extensions, ignored_dirs = excluded.ignored_dirs, download_files = excluded.download_files, ai_check = excluded.ai_check,
-		updated_by = excluded.updated_by, updated_at = now()`,
+		ai_groups = excluded.ai_groups, read_all_pages = excluded.read_all_pages, updated_by = excluded.updated_by, updated_at = now()`,
 		courseID, c.TrackDeadlines, c.LatePenaltyEnabled, c.LatePenalty, c.RequireCode, c.ExtrasEnabled,
 		c.LateNotice, c.MaxImages, c.PartialCredit, c.PointsStep, c.SimilarPercent, c.CopyPercent, c.CopyIdenticalFiles, c.TemplateMinWorks, c.TemplateShare,
-		nonNil(c.CodeExtensions), nonNil(c.IgnoredDirs), c.DownloadFiles, c.AICheck, userID)
+		nonNil(c.CodeExtensions), nonNil(c.IgnoredDirs), c.DownloadFiles, c.AICheck, nonNil(c.AIGroups), c.ReadAllPages, userID)
 	return wrap("save course settings", err)
+}
+
+// AssignmentAICheck reports whether the AI check is on for the assignment; it is until the teacher turns it off.
+func (s *Store) AssignmentAICheck(ctx context.Context, assignmentID int64) (bool, error) {
+	on := true
+	err := s.db.QueryRow(ctx, `select ai_check from settings.assignment_settings where assignment_id = $1`, assignmentID).Scan(&on)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return true, nil
+	}
+
+	return on, wrap("assignment ai check", err)
+}
+
+func (s *Store) SetAssignmentAICheck(ctx context.Context, assignmentID int64, on bool) error {
+	_, err := s.db.Exec(ctx, `insert into settings.assignment_settings (assignment_id, ai_check) values ($1, $2)
+		on conflict (assignment_id) do update set ai_check = excluded.ai_check`, assignmentID, on)
+	return wrap("set assignment ai check", err)
 }
 
 func (s *Store) PromptOverrides(ctx context.Context, courseID int64) (map[string]string, error) {

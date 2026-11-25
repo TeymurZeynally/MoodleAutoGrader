@@ -133,8 +133,31 @@ func TestEveryQueryRuns(t *testing.T) {
 	files, err := s.Files(ctx, sub, true)
 	must("Files", err)
 	must("MarkDownloaded", s.MarkDownloaded(ctx, files[0].ID, "k", "abc"))
-	_, err = s.SubmittedIDs(ctx, assignID, false)
-	must("SubmittedIDs", err)
+	for _, c := range []struct {
+		groups []string
+		want   int
+	}{{nil, 1}, {[]string{"G2", "G1"}, 1}, {[]string{"G2"}, 0}} {
+		if got, err := s.SubmittedIDs(ctx, assignID, false, c.groups); err != nil || len(got) != c.want {
+			t.Fatalf("works of the groups %v: %v %v", c.groups, got, err)
+		}
+	}
+
+	if on, err := s.AssignmentAICheck(ctx, assignID); err != nil || !on {
+		t.Fatalf("the AI check is on for an assignment until turned off: %v %v", on, err)
+	}
+
+	must("SetAssignmentAICheck", s.SetAssignmentAICheck(ctx, assignID, false))
+	assigns, err := s.Assignments(ctx, courseID)
+	must("Assignments", err)
+	head, err := s.Assignment(ctx, assignID)
+	must("Assignment", err)
+	sheet, err := s.Submissions(ctx, assignID)
+	must("Submissions", err)
+	if on, err := s.AssignmentAICheck(ctx, assignID); err != nil || on || assigns[0].AICheck || head.AICheck || sheet[0].AICheck {
+		t.Fatalf("the AI check turned off for an assignment: %v %v %+v %+v %+v", on, err, assigns[0], head, sheet[0])
+	}
+
+	must("SetAssignmentAICheck on", s.SetAssignmentAICheck(ctx, assignID, true))
 
 	// settings
 	c := course.Defaults()
@@ -146,10 +169,14 @@ func TestEveryQueryRuns(t *testing.T) {
 		t.Fatalf("settings round trip: %+v", got)
 	}
 
-	c.DownloadFiles, c.AICheck = false, false
+	if got.AIGroups == nil || len(got.AIGroups) != 0 {
+		t.Fatalf("the AI check covers every group by default: %#v", got.AIGroups)
+	}
+
+	c.DownloadFiles, c.AICheck, c.AIGroups, c.ReadAllPages = false, false, []string{"G1"}, true
 	must("SaveCourseSettings", s.SaveCourseSettings(ctx, courseID, user, c))
-	if got, err := s.CourseSettings(ctx, courseID); err != nil || got.DownloadFiles || got.AICheck {
-		t.Fatalf("a course without files and AI check: %+v %v", got, err)
+	if got, err := s.CourseSettings(ctx, courseID); err != nil || got.DownloadFiles || got.AICheck || !slices.Equal(got.AIGroups, []string{"G1"}) || !got.ReadAllPages {
+		t.Fatalf("a course without files and AI check, with AI groups: %+v %v", got, err)
 	}
 
 	must("SetPrompt", s.SetPrompt(ctx, courseID, "check.user", "{{.Work}} {{.Checklist}}", user))
@@ -186,6 +213,10 @@ func TestEveryQueryRuns(t *testing.T) {
 	res := &assessment.Result{Points: 4, Max: 5, Criteria: []assessment.CriterionResult{{ID: "c1", Status: "met"}}}
 	must("FinishAssessment", s.FinishAssessment(ctx, sub, "done", "files", checklist, "model-a", map[string]string{"check": "model-a"}, res, "ok", ""))
 	must("FinishExperiment", s.FinishExperiment(ctx, sub, "done", "files", checklist, "model-b", nil, res, "ok", "", now))
+	if got, err := s.AIResults(ctx, assignID); err != nil || len(got) != 1 || got[sub].Points != 4 || got[sub].Criteria[0].ID != "c1" {
+		t.Fatalf("the AI results of an assignment: %+v %v", got, err)
+	}
+
 	_, err = s.AssessmentHash(ctx, sub)
 	must("AssessmentHash", err)
 	must("SkipAssessment", s.SkipAssessment(ctx, sub))
@@ -321,10 +352,10 @@ func TestAttemptsOfOneStudent(t *testing.T) {
 		if r.ID != id || r.Attempt != shownAttempt || len(r.Files) != files || (open == nil) != (r.OpenAttempt == nil) || (open != nil && *open != *r.OpenAttempt) {
 			t.Fatalf("%s: %+v", what, r)
 		}
-		if got, err := s.SubmittedIDs(ctx, assignID, false); err != nil || !slices.Equal(got, toCheck) {
+		if got, err := s.SubmittedIDs(ctx, assignID, false, nil); err != nil || !slices.Equal(got, toCheck) {
 			t.Fatalf("%s: to check %v, want %v (%v)", what, got, toCheck, err)
 		}
-		if got, err := s.SubmittedIDs(ctx, assignID, true); err != nil || !slices.Equal(got, toCheckGraded) {
+		if got, err := s.SubmittedIDs(ctx, assignID, true, nil); err != nil || !slices.Equal(got, toCheckGraded) {
 			t.Fatalf("%s: with graded %v, want %v (%v)", what, got, toCheckGraded, err)
 		}
 	}

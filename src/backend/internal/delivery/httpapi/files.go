@@ -41,7 +41,7 @@ func (s *Server) fileRaw(w http.ResponseWriter, r *http.Request, a authed) {
 		return
 	}
 
-	c, err := s.Viewing.Open(r.Context(), id, fileID, r.URL.Query()["p"], r.URL.Query().Get("as") == "text")
+	c, err := s.Viewing.Open(r.Context(), id, fileID, r.URL.Query()["p"], r.URL.Query().Get("as"))
 	if err != nil {
 		s.fail(w, err)
 		return

@@ -75,13 +75,15 @@ func (s *Store) SubmissionCourse(ctx context.Context, submissionID int64) (int64
 
 // SubmittedIDs lists the works of an assignment to check, in upload order: each student's newest submitted attempt.
 // Works that already have a grade in the Moodle gradebook are left out unless includeGraded, and so are works with a
-// newer attempt opened: Moodle has no grade for that attempt yet, but the student has sent nothing new.
-func (s *Store) SubmittedIDs(ctx context.Context, assignmentID int64, includeGraded bool) ([]int64, error) {
+// newer attempt opened: Moodle has no grade for that attempt yet, but the student has sent nothing new. With groups,
+// only works of students in one of them.
+func (s *Store) SubmittedIDs(ctx context.Context, assignmentID int64, includeGraded bool, groups []string) ([]int64, error) {
 	rows, err := s.db.Query(ctx, `select s.id from moodle.submissions s join moodle.students st on st.id = s.student_id
 		where s.assignment_id = $1 and s.moodle_status = 'submitted'
 		and ($2 or not exists (select 1 from moodle.moodle_grades g where g.assignment_id = s.assignment_id and g.moodle_user_id = st.moodle_user_id))
 		and not exists (select 1 from moodle.submissions n where n.assignment_id = s.assignment_id and n.student_id = s.student_id and n.attempt > s.attempt and (not $2 or n.moodle_status = 'submitted'))
-		order by s.submitted_at nulls last, s.id`, assignmentID, includeGraded)
+		and (cardinality($3::text[]) = 0 or st.groups && $3)
+		order by s.submitted_at nulls last, s.id`, assignmentID, includeGraded, nonNil(groups))
 	if err != nil {
 		return nil, wrap("submitted ids", err)
 	}

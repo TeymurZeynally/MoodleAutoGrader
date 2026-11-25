@@ -63,6 +63,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("PUT /api/courses/{id}/settings", s.auth(s.saveCourseSettings))
 	// The grade sheet, of an assignment or of a student (grades.go).
 	mux.Handle("GET /api/assignments/{id}/submissions", s.auth(s.submissions))
+	mux.Handle("GET /api/assignments/{id}/export", s.auth(s.exportSheet))
 	mux.Handle("GET /api/courses/{id}/students", s.auth(s.students))
 	mux.Handle("GET /api/courses/{id}/students/{student}", s.auth(s.studentSheet))
 	mux.Handle("PUT /api/submissions/{id}/draft", s.auth(s.updateDraft))
@@ -85,6 +86,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("PUT /api/assignments/{id}/checklist", s.auth(s.saveChecklist))
 	mux.Handle("POST /api/assignments/{id}/checklist/approve", s.auth(s.approveChecklist))
 	mux.Handle("PUT /api/assignments/{id}/notes", s.auth(s.saveNotes))
+	mux.Handle("PUT /api/assignments/{id}/ai-check", s.auth(s.setAICheck))
 	mux.Handle("GET /api/assignments/{id}/prompt-preview", s.auth(s.promptPreview))
 	mux.Handle("GET /api/courses/{id}/prompts", s.auth(s.prompts))
 	mux.Handle("PUT /api/courses/{id}/prompts/{key}", s.auth(s.savePrompt))

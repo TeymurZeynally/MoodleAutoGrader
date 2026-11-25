@@ -115,9 +115,10 @@ func (s *Service) ModelList(ctx context.Context) ([]string, error) {
 	return list, nil
 }
 
-// modelsProblem says, in words for the teacher, why the AI check of a course cannot run: it is off in the course's
-// settings, or its models with the given ones (step -> model) over them are not chosen or not downloaded; "" when it can.
-func (s *Service) modelsProblem(ctx context.Context, courseID int64, models map[string]string) (string, error) {
+// modelsProblem says, in words for the teacher, why the AI check of an assignment cannot run: it is off in the course's
+// settings or for the assignment, or the course's models with the given ones (step -> model) over them are not chosen
+// or not downloaded; "" when it can.
+func (s *Service) modelsProblem(ctx context.Context, courseID, assignmentID int64, models map[string]string) (string, error) {
 	settings, err := s.Store.CourseSettings(ctx, courseID)
 	if err != nil {
 		return "", err
@@ -125,6 +126,15 @@ func (s *Service) modelsProblem(ctx context.Context, courseID int64, models map[
 
 	if !settings.AICheck {
 		return `The AI check is off in this course: turn on "AI check" in the course settings.`, nil
+	}
+
+	on, err := s.Store.AssignmentAICheck(ctx, assignmentID)
+	if err != nil {
+		return "", err
+	}
+
+	if !on {
+		return `The AI check is off for this assignment: turn it on in the "AI check" column of the course's assignments.`, nil
 	}
 
 	over, err := s.Store.PromptOverrides(ctx, courseID)
@@ -164,7 +174,7 @@ func (s *Service) modelsProblem(ctx context.Context, courseID int64, models map[
 
 // requireModels refuses to start a check that cannot run on its models. With the AI check off a request for the
 // course's models does nothing, as before.
-func (s *Service) requireModels(ctx context.Context, courseID int64, models map[string]string) error {
+func (s *Service) requireModels(ctx context.Context, courseID, assignmentID int64, models map[string]string) error {
 	if s.Models == nil {
 		if len(models) > 0 {
 			return app.Fail(app.ErrUnavailable, "the AI check is off")
@@ -172,7 +182,7 @@ func (s *Service) requireModels(ctx context.Context, courseID int64, models map[
 		return nil
 	}
 
-	problem, err := s.modelsProblem(ctx, courseID, models)
+	problem, err := s.modelsProblem(ctx, courseID, assignmentID, models)
 	if err != nil {
 		return err
 	}

@@ -65,7 +65,7 @@ func (s *Service) EnsureChecklist(ctx context.Context, assignmentID int64, rebui
 	}
 
 	// No model to build it with yet: a sync goes on, and a request of the teacher was refused before it got here.
-	if problem, err := s.modelsProblem(ctx, t.CourseID, nil); err != nil || problem != "" {
+	if problem, err := s.modelsProblem(ctx, t.CourseID, assignmentID, nil); err != nil || problem != "" {
 		return 0, err
 	}
 
@@ -128,7 +128,7 @@ func (s *Service) Checklist(ctx context.Context, assignmentID int64) (ChecklistP
 	}
 
 	if s.Enabled() {
-		problem, err := s.modelsProblem(ctx, t.CourseID, nil)
+		problem, err := s.modelsProblem(ctx, t.CourseID, assignmentID, nil)
 		if err != nil {
 			problem = err.Error()
 		}
@@ -156,6 +156,11 @@ func (s *Service) SaveChecklist(ctx context.Context, userID, assignmentID int64,
 
 func (s *Service) ApproveChecklist(ctx context.Context, userID, assignmentID int64) error {
 	return s.Store.ApproveChecklist(ctx, assignmentID, userID)
+}
+
+// SetAICheck turns the AI check of one assignment on or off; off, no checklist is built and no work of it analyzed.
+func (s *Service) SetAICheck(ctx context.Context, assignmentID int64, on bool) error {
+	return s.Store.SetAssignmentAICheck(ctx, assignmentID, on)
 }
 
 // SaveNotes stores the teacher's notes for the grader of an assignment.

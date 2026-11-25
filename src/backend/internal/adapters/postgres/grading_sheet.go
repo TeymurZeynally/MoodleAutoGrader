@@ -47,7 +47,8 @@ func (s *Store) sheet(ctx context.Context, assignmentID, courseID, studentID int
 			from moodle.moodle_attempts ma cross join lateral jsonb_array_elements(ma.attempts) as x(j)
 			left join moodle.submissions w on w.assignment_id = a.id and w.student_id = st.id and w.attempt = (x.j->>'attempt')::int
 			where ma.assignment_id = a.id and ma.moodle_user_id = st.moodle_user_id), '[]'),
-		a.id, a.name, a.due_at, a.max_grade::float8, a.cmid, exists(select 1 from ai.checklists c where c.assignment_id = a.id)
+		a.id, a.name, a.due_at, a.max_grade::float8, a.cmid, exists(select 1 from ai.checklists c where c.assignment_id = a.id),
+		coalesce((select x.ai_check from settings.assignment_settings x where x.assignment_id = a.id), true)
 		from moodle.assignments a join moodle.students st on st.course_id = a.course_id
 		left join lateral (select x.* from moodle.submissions x where x.assignment_id = a.id and x.student_id = st.id
 			order by x.moodle_status = 'submitted' desc, x.attempt desc limit 1) s on true
@@ -76,7 +77,7 @@ func (s *Store) sheet(ctx context.Context, assignmentID, courseID, studentID int
 		err := r.Scan(&x.ID, &x.StudentID, &x.MoodleUserID, &x.Student, &x.ShortName, &x.Enrolled, &x.MoodleGrade, &x.GradedAt, &x.Groups, &x.MoodleStatus, &x.SubmittedAt,
 			&x.Files, &x.Flags, &x.Integrity, &x.Points, &x.Comment, &x.Source, &x.Version, &x.State, &x.PublishError,
 			&ai.Status, &ai.Points, &ai.Met, &ai.Total, &ai.Extra, &ai.Score, &ai.Late, &x.Late, &x.Attempt, &x.Resubmitted, &x.OpenAttempt, &x.OpenStatus, &x.Attempts,
-			&x.AssignmentID, &x.Assignment, &x.DueAt, &x.MaxGrade, &x.CMID, &x.HasChecklist)
+			&x.AssignmentID, &x.Assignment, &x.DueAt, &x.MaxGrade, &x.CMID, &x.HasChecklist, &x.AICheck)
 		if ai.Status != nil {
 			x.AI = &grading.AISummary{Status: *ai.Status, Points: ai.Points, Met: ai.Met, Total: ai.Total, Extra: ai.Extra, Score: ai.Score, Late: ai.Late}
 		}

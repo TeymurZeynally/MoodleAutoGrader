@@ -22,6 +22,8 @@ type Store interface {
 	SetGraderNotes(ctx context.Context, assignmentID int64, notes string) error
 	AssignmentText(ctx context.Context, assignmentID int64) (work.Assignment, error)
 	CourseSettings(ctx context.Context, courseID int64) (course.Settings, error)
+	AssignmentAICheck(ctx context.Context, assignmentID int64) (bool, error)
+	SetAssignmentAICheck(ctx context.Context, assignmentID int64, on bool) error
 
 	PromptOverrides(ctx context.Context, courseID int64) (map[string]string, error)
 	PromptEdits(ctx context.Context, courseID int64) (map[string]PromptEdit, error)
@@ -31,8 +33,9 @@ type Store interface {
 	Submission(ctx context.Context, id int64) (work.Submission, error)
 	Files(ctx context.Context, submissionID int64, pendingOnly bool) ([]work.File, error)
 	PreviousComment(ctx context.Context, submissionID int64) (string, *time.Time, error)
-	// SubmittedIDs lists the submitted works in upload order; works graded in Moodle only with includeGraded.
-	SubmittedIDs(ctx context.Context, assignmentID int64, includeGraded bool) ([]int64, error)
+	// SubmittedIDs lists the submitted works in upload order; works graded in Moodle only with includeGraded, and with
+	// groups only works of students in one of them.
+	SubmittedIDs(ctx context.Context, assignmentID int64, includeGraded bool, groups []string) ([]int64, error)
 	FailedIDs(ctx context.Context, assignmentID int64) ([]int64, error)
 
 	QueueAssessments(ctx context.Context, ids []int64) error
@@ -61,8 +64,9 @@ type Uploads interface {
 	Snapshot(ctx context.Context, submissionID int64) (work.Snapshot, error)
 	// FileList lists the uploaded files with the paths inside archives, without the course's ignored folders and binaries.
 	FileList(ctx context.Context, files []work.File, codeExtensions, ignoredDirs []string) []string
-	// Images returns up to limit pictures: PDF pages with images, DOCX media, images in archives.
-	Images(ctx context.Context, files []work.File, limit int) []Image
+	// Images returns up to limit pictures: PDF pages with images (with allPages every page), the pages of Word documents
+	// laid out the same way, images in archives.
+	Images(ctx context.Context, files []work.File, limit int, allPages bool) []Image
 }
 
 type Image struct {

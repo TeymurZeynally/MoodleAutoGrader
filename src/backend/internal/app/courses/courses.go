@@ -100,6 +100,7 @@ type Assignment struct {
 	Flagged         int        `json:"flagged"`
 	Published       int        `json:"published"`
 	AI              AIProgress `json:"ai"`
+	AICheck         bool       `json:"ai_check"` // off: the AI check leaves the assignment to the teacher
 }
 
 // AIProgress counts the works of an assignment by AI check status; HasChecklist is false until the first checklist exists.

@@ -21,7 +21,9 @@ CREATE TABLE settings.course_settings (
     code_extensions text[],
     ignored_dirs text[],
     download_files boolean DEFAULT true NOT NULL,
-    ai_check boolean DEFAULT true NOT NULL
+    ai_check boolean DEFAULT true NOT NULL,
+    ai_groups text[] DEFAULT '{}'::text[] NOT NULL,
+    read_all_pages boolean DEFAULT false NOT NULL
 );
 
 ALTER TABLE ONLY settings.course_settings

@@ -33,6 +33,21 @@ func (s *Server) approveChecklist(w http.ResponseWriter, r *http.Request, a auth
 	}
 }
 
+// setAICheck turns the AI check of an assignment on or off.
+func (s *Server) setAICheck(w http.ResponseWriter, r *http.Request, a authed) {
+	id, ok := s.assignment(w, r, a)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		On bool `json:"on"`
+	}
+	if decode(w, r, &req) {
+		s.noContent(w, s.Assessing.SetAICheck(r.Context(), id, req.On))
+	}
+}
+
 func (s *Server) saveNotes(w http.ResponseWriter, r *http.Request, a authed) {
 	id, ok := s.assignment(w, r, a)
 	if !ok {
